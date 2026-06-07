@@ -7,6 +7,26 @@ from dataclasses import dataclass
 from dataclasses import field
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        return default
+
+
 @dataclass(slots=True)
 class Settings:
     ark_api_key: str = field(default_factory=lambda: os.getenv("ARK_API_KEY", ""))
@@ -18,7 +38,7 @@ class Settings:
         default_factory=lambda: os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
     )
     ark_image_model: str = field(
-        default_factory=lambda: os.getenv("ARK_IMAGE_MODEL", "doubao-seedream-4-5-251128")
+        default_factory=lambda: os.getenv("ARK_IMAGE_MODEL", "doubao-seedream-5-0-260128")
     )
     ark_image_size: str = field(default_factory=lambda: os.getenv("ARK_IMAGE_SIZE", "2K"))
     gemini_image_model: str = field(
@@ -46,6 +66,16 @@ class Settings:
     upload_remote_dir: str = field(default_factory=lambda: os.getenv("UPLOAD_REMOTE_DIR", ""))
     upload_public_base_url: str = field(
         default_factory=lambda: os.getenv("UPLOAD_PUBLIC_BASE_URL", "")
+    )
+    http_max_retries: int = field(default_factory=lambda: _env_int("AI_TOOLKIT_HTTP_MAX_RETRIES", 2))
+    http_retry_base_seconds: float = field(
+        default_factory=lambda: _env_float("AI_TOOLKIT_HTTP_RETRY_BASE_SECONDS", 0.5)
+    )
+    http_retry_max_seconds: float = field(
+        default_factory=lambda: _env_float("AI_TOOLKIT_HTTP_RETRY_MAX_SECONDS", 8.0)
+    )
+    http_timeout_seconds: float = field(
+        default_factory=lambda: _env_float("AI_TOOLKIT_HTTP_TIMEOUT_SECONDS", 120.0)
     )
 
 

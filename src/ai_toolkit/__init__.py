@@ -10,7 +10,9 @@ __version__ = "0.2.0"
 
 from ai_toolkit import capabilities
 from ai_toolkit import chat
+from ai_toolkit import embeddings
 from ai_toolkit import images
+from ai_toolkit import videos
 from ai_toolkit.ark import ArkEmbeddingError
 from ai_toolkit.ark import ArkImageError
 from ai_toolkit.ark import ArkMultimodalError
@@ -19,6 +21,7 @@ from ai_toolkit.ark import create_image_generation
 from ai_toolkit.ark import create_multimodal_embedding
 from ai_toolkit.ark import create_responses
 from ai_toolkit.ark import create_seedream_4_5_image_generation
+from ai_toolkit.ark import create_seedream_5_0_lite_image_generation
 from ai_toolkit.ark import create_video_generation_task
 from ai_toolkit.ark import get_video_generation_task
 from ai_toolkit.config import Settings
@@ -34,19 +37,29 @@ from ai_toolkit.media import upload_public_url
 from ai_toolkit.media import upload_via_ssh
 from ai_toolkit.types import AIToolkitError
 from ai_toolkit.types import ChatCompletionResult
+from ai_toolkit.types import EmbeddingResult
 from ai_toolkit.types import GeneratedImage
+from ai_toolkit.types import GeneratedVideo
 from ai_toolkit.types import ImageGenerationResult
+from ai_toolkit.types import VideoGenerationResult
+from ai_toolkit.types import VideoGenerationTask
 
 __all__ = [
     "__version__",
     # High-level SDK modules
     "capabilities",
     "chat",
+    "embeddings",
     "images",
+    "videos",
     "AIToolkitError",
     "ChatCompletionResult",
+    "EmbeddingResult",
     "GeneratedImage",
+    "GeneratedVideo",
     "ImageGenerationResult",
+    "VideoGenerationResult",
+    "VideoGenerationTask",
     # ARK
     "ArkEmbeddingError",
     "ArkImageError",
@@ -55,6 +68,7 @@ __all__ = [
     "create_image_generation",
     "create_multimodal_embedding",
     "create_seedream_4_5_image_generation",
+    "create_seedream_5_0_lite_image_generation",
     "create_responses",
     "create_video_generation_task",
     "get_video_generation_task",

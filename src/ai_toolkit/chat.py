@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ai_toolkit.ark import create_responses
@@ -28,6 +29,59 @@ def complete(
     raise AIToolkitError(f"unknown chat provider: {provider}")
 
 
+def complete_json(
+    *,
+    provider: str,
+    messages: list[dict[str, Any]] | None = None,
+    prompt: str | None = None,
+    model: str | None = None,
+    schema: dict[str, Any] | None = None,
+    schema_name: str = "structured_response",
+    strict: bool = True,
+    disable_thinking: bool = True,
+    **kwargs: Any,
+) -> ChatCompletionResult:
+    """Generate JSON with provider-appropriate structured-output settings.
+
+    For ARK Responses API this uses the official `text.format` field and,
+    by default, disables deep thinking for short extraction tasks.
+    """
+    normalized_provider = normalize_provider(provider)
+    request_kwargs = dict(kwargs)
+    if normalized_provider == "ark":
+        request_kwargs.setdefault(
+            "text",
+            _ark_text_format(schema=schema, schema_name=schema_name, strict=strict),
+        )
+        if disable_thinking:
+            request_kwargs.setdefault("thinking", {"type": "disabled"})
+    elif normalized_provider == "deepseek":
+        request_kwargs.setdefault("response_format", {"type": "json_object"})
+        if disable_thinking:
+            request_kwargs.setdefault("thinking", {"type": "disabled"})
+
+    result = complete(
+        provider=provider,
+        messages=messages,
+        prompt=prompt,
+        model=model,
+        **request_kwargs,
+    )
+    result.parsed_json = _parse_json(result.text)
+    return result
+
+
+def multimodal_user_message(
+    *,
+    text: str,
+    images: list[str] | tuple[str, ...] = (),
+) -> dict[str, Any]:
+    """Build a Responses-compatible user message with text and image URLs."""
+    content: list[dict[str, str]] = [{"type": "input_text", "text": text}]
+    content.extend({"type": "input_image", "image_url": str(image)} for image in images)
+    return {"role": "user", "content": content}
+
+
 def normalize_provider(provider: str) -> str:
     value = provider.strip().lower()
     if value in {"ark", "doubao", "volcengine"}:
@@ -35,6 +89,47 @@ def normalize_provider(provider: str) -> str:
     if value == "deepseek":
         return "deepseek"
     return value
+
+
+def _ark_text_format(
+    *,
+    schema: dict[str, Any] | None,
+    schema_name: str,
+    strict: bool,
+) -> dict[str, Any]:
+    if schema is None:
+        return {"format": {"type": "json_object"}}
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": schema_name,
+            "strict": strict,
+            "schema": schema,
+        }
+    }
+
+
+def _parse_json(text: str) -> Any | None:
+    stripped = text.strip()
+    for value in (stripped, *_json_blocks(stripped)):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def _json_blocks(text: str) -> list[str]:
+    blocks: list[str] = []
+    stack: list[int] = []
+    for index, char in enumerate(text):
+        if char == "{":
+            stack.append(index)
+        elif char == "}" and stack:
+            start = stack.pop()
+            if not stack:
+                blocks.append(text[start : index + 1])
+    return blocks
 
 
 def _complete_deepseek(

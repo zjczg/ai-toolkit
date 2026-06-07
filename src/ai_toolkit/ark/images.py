@@ -20,17 +20,17 @@ def create_image_generation(
     """Submit an image generation request and return the raw API response.
 
     Required:
-        model:  e.g. "doubao-seedream-4-5-251128"
+        model:  e.g. "doubao-seedream-5-0-260128"
         prompt: image description text
 
     Optional (via kwargs):
         image: reference image URL (for image-to-image)
-        size: e.g. "2K", "4K"
+        size: e.g. "2K", "3K", "4K"
         response_format: "url" (default) or "b64_json"
         watermark: bool
         sequential_image_generation: "disabled" | "auto"
         stream: bool
-        output_format: "png", "jpeg", "webp"
+        output_format: "png", "jpeg" (Seedream 5.0 lite)
     """
     settings = get_settings()
     if not settings.ark_api_key:
@@ -60,7 +60,6 @@ def create_seedream_4_5_image_generation(
     URL response, 2K size, sequential generation disabled, no streaming,
     and watermark enabled. Pass any keyword to override these defaults.
     """
-    settings = get_settings()
     payload_kwargs: dict[str, Any] = {
         "sequential_image_generation": "disabled",
         "response_format": "url",
@@ -69,5 +68,28 @@ def create_seedream_4_5_image_generation(
         "watermark": True,
     }
     payload_kwargs.update(kwargs)
-    model = str(payload_kwargs.pop("model", settings.ark_image_model))
+    model = str(payload_kwargs.pop("model", "doubao-seedream-4-5-251128"))
+    return create_image_generation(model, prompt, **payload_kwargs)
+
+
+def create_seedream_5_0_lite_image_generation(
+    prompt: str,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Submit a Seedream 5.0 lite image generation request.
+
+    Defaults use the current ARK image generation API shape:
+    URL response, 2K size, PNG output, sequential generation disabled,
+    no streaming, and no watermark. Pass any keyword to override them.
+    """
+    payload_kwargs: dict[str, Any] = {
+        "sequential_image_generation": "disabled",
+        "response_format": "url",
+        "size": "2K",
+        "output_format": "png",
+        "stream": False,
+        "watermark": False,
+    }
+    payload_kwargs.update(kwargs)
+    model = str(payload_kwargs.pop("model", "doubao-seedream-5-0-260128"))
     return create_image_generation(model, prompt, **payload_kwargs)

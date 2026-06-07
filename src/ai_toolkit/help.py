@@ -21,10 +21,11 @@ _INTERFACES: list[InterfaceSpec] = [
         "function": "create_image_generation",
         "description": "图片生成 — 返回原始 JSON，data[0].url 即生成图片链接",
         "parameters": [
-            ("model", "str", "必填 — 模型名，如 doubao-seedream-4-5-251128"),
+            ("model", "str", "必填 — 模型名，如 doubao-seedream-5-0-260128"),
             ("prompt", "str", "必填 — 图片描述文本"),
             ("image", "list[str]", '可选 (kwargs) — 参考图片 URL 数组，单张为图生图，多张为多图融合'),
-            ("size", "str", '可选 (kwargs) — "2k"(默认)≈2048²、"3k"(仅5.0)、"4k"，或自定义 "1920x1080"。1K 仅 seedream-4-0 支持'),
+            ("size", "str", '可选 (kwargs) — "2k"(默认)≈2048²、"3k"(仅5.0)、"4k"，或自定义 "1920x1080"；Seedream 4.5 自定义 WxH 需满足最小总像素 3,686,400，1024x256/2048x512 这类小条需放大生成后处理'),
+            ("output_format", "str", '可选 (kwargs) — Seedream 5.0 lite 支持 "png" 或 "jpeg"'),
             ("response_format", "str", '可选 (kwargs) — "url"（默认）或 "b64_json"'),
             ("watermark", "bool", "可选 (kwargs) — 是否添加水印，各版本默认值不同建议显式设置"),
             ("stream", "bool", "可选 (kwargs) — 是否开启 SSE 流式输出"),
@@ -43,6 +44,16 @@ _INTERFACES: list[InterfaceSpec] = [
             ("**kwargs", "Any", "可选 — 覆盖默认 payload 字段，如 watermark=False 或 image=[...]"),
         ],
     },
+    {
+        "provider": "ARK (豆包/火山引擎)",
+        "endpoint": "POST /images/generations",
+        "function": "create_seedream_5_0_lite_image_generation",
+        "description": "Seedream 5.0 lite 图片生成便捷方法，默认 model=doubao-seedream-5-0-260128、size=2K、output_format=png、response_format=url、sequential_image_generation=disabled、stream=false、watermark=false",
+        "parameters": [
+            ("prompt", "str", "必填 — 图片描述文本"),
+            ("**kwargs", "Any", "可选 — 覆盖默认 payload 字段，如 output_format=\"jpeg\" 或 image=[...]"),
+        ],
+    },
     # -- ARK Multimodal -------------------------------------------------------
     {
         "provider": "ARK (豆包/火山引擎)",
@@ -53,10 +64,26 @@ _INTERFACES: list[InterfaceSpec] = [
             ("model", "str", "必填 — 模型名，如 doubao-seed-2-0-pro-260215"),
             ("input", "str | list[dict]", "必填 — 纯文本字符串 或 结构化 [{\"role\": \"user\", \"content\": [...]}]"),
             ("stream", "bool", "可选 (kwargs) — 是否 SSE 流式返回"),
-            ("reasoning", "dict", "可选 (kwargs) — 深度思考配置，如 {\"effort\": \"high\"}"),
+            ("thinking", "dict", "可选 (kwargs) — 深度思考配置，如 {\"type\": \"disabled\"} 或 {\"type\": \"enabled\", \"reasoning_effort\": \"high\"}"),
+            ("text", "dict", "可选 (kwargs) — Responses 结构化输出，如 {\"format\":{\"type\":\"json_object\"}} 或 json_schema"),
             ("tools", "list[dict]", "可选 (kwargs) — function calling 工具定义"),
             ("temperature", "float", "可选 (kwargs) — 温度参数"),
             ("max_output_tokens", "int", "可选 (kwargs) — 最大输出 token 数"),
+        ],
+    },
+    {
+        "provider": "ARK (豆包/火山引擎)",
+        "endpoint": "POST /responses",
+        "function": "chat.complete_json",
+        "description": "结构化 JSON 生成便捷方法 — Ark 使用 Responses API 的 text.format，默认关闭 thinking，并返回 parsed_json",
+        "parameters": [
+            ("provider", "str", "必填 — ark/doubao/volcengine 或 deepseek"),
+            ("messages", "list[dict]", "可选 — 支持 multimodal_user_message(text=..., images=[...]) 构造图文输入"),
+            ("prompt", "str", "可选 — 纯文本输入；messages 与 prompt 二选一"),
+            ("schema", "dict", "可选 — JSON Schema；Ark 会映射为 text.format.type=json_schema"),
+            ("schema_name", "str", "可选 — JSON Schema 名称"),
+            ("disable_thinking", "bool", "可选 — 默认 True，Ark 映射为 thinking={\"type\":\"disabled\"}"),
+            ("**kwargs", "Any", "可选 — 透传 provider 支持的其他 payload 字段"),
         ],
     },
     {
