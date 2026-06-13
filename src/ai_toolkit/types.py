@@ -64,6 +64,7 @@ class ImageGenerationResult:
     text: str = ""
     raw_response: dict[str, Any] | None = None
     request: dict[str, Any] | None = None
+    usage: dict[str, Any] | None = None
 
     def first_image(self) -> GeneratedImage:
         if not self.images:

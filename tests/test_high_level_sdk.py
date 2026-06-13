@@ -13,7 +13,7 @@ from ai_toolkit.videos import _extract_videos
 
 
 def test_version_is_updated():
-    assert __version__ == "0.2.0"
+    assert __version__ == "0.3.0"
 
 
 def test_provider_aliases():
@@ -124,7 +124,10 @@ def test_ark_image_generation_only_sends_explicit_output_format(monkeypatch):
         captured["model"] = model
         captured["prompt"] = prompt
         captured["kwargs"] = kwargs
-        return {"data": [{"url": "https://example.com/out.png"}]}
+        return {
+            "data": [{"url": "https://example.com/out.png"}],
+            "usage": {"output_tokens": 12, "total_tokens": 12},
+        }
 
     monkeypatch.setattr(images, "create_image_generation", fake_create_image_generation)
 
@@ -135,6 +138,7 @@ def test_ark_image_generation_only_sends_explicit_output_format(monkeypatch):
     )
 
     assert result.images[0].url == "https://example.com/out.png"
+    assert result.usage == {"output_tokens": 12, "total_tokens": 12}
     assert "output_format" not in captured["kwargs"]
 
     images.generate(
@@ -142,6 +146,116 @@ def test_ark_image_generation_only_sends_explicit_output_format(monkeypatch):
         model="doubao-seedream-5-0-260128",
         prompt="生成一张图",
         output_format="png",
+    )
+
+    assert captured["kwargs"]["output_format"] == "png"
+
+
+def test_find_image_path_by_model_resolves_known_ids():
+    assert (
+        capabilities.find_image_path_by_model("doubao-seedream-5-0-260128") == "doubao-5.0-lite"
+    )
+    assert capabilities.find_image_path_by_model("doubao-seedream-4-5-251128") == "doubao-4.5"
+    assert capabilities.find_image_path_by_model("unknown-model") is None
+    assert capabilities.find_image_path_by_model(None) is None
+
+
+def test_get_image_capability_prefers_path_then_falls_back_to_model():
+    by_path = capabilities.get_image_capability(path="doubao-4.5")
+    assert by_path is not None and by_path["model"] == "doubao-seedream-4-5-251128"
+
+    by_model = capabilities.get_image_capability(model="doubao-seedream-5-0-260128")
+    assert by_model is not None and by_model["model"] == "doubao-seedream-5-0-260128"
+
+    assert capabilities.get_image_capability(path="bogus") is None
+    assert capabilities.get_image_capability(model="bogus") is None
+    assert capabilities.get_image_capability() is None
+
+
+_TINY_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+)
+
+
+def _fake_b64_response(captured):
+    def fake_create_image_generation(model, prompt, **kwargs):
+        captured["model"] = model
+        captured["prompt"] = prompt
+        captured["kwargs"] = kwargs
+        return {"data": [{"b64_json": _TINY_PNG_B64}]}
+
+    return fake_create_image_generation
+
+
+def test_generate_with_path_resolves_provider_and_model(monkeypatch, tmp_path):
+    captured = {}
+    monkeypatch.setattr(images, "create_image_generation", _fake_b64_response(captured))
+
+    images.generate(
+        path="doubao-5.0-lite",
+        prompt="生成",
+        output_path=tmp_path / "result.png",
+    )
+
+    assert captured["model"] == "doubao-seedream-5-0-260128"
+    # 5.0 lite supports output_format; SDK infers from output_path suffix
+    assert captured["kwargs"]["output_format"] == "png"
+
+
+def test_generate_with_path_drops_output_format_for_4_5(monkeypatch, tmp_path):
+    captured = {}
+    monkeypatch.setattr(images, "create_image_generation", _fake_b64_response(captured))
+
+    images.generate(
+        path="doubao-4.5",
+        prompt="生成",
+        output_path=tmp_path / "result.jpg",
+        output_format="jpeg",  # caller mistakenly provides it
+    )
+
+    # 4.5 does not support output_format; SDK drops it silently
+    assert "output_format" not in captured["kwargs"]
+
+
+def test_generate_with_path_infers_jpeg_from_jpg_suffix(monkeypatch, tmp_path):
+    captured = {}
+    monkeypatch.setattr(images, "create_image_generation", _fake_b64_response(captured))
+
+    images.generate(
+        path="doubao-5.0-lite",
+        prompt="生成",
+        output_path=tmp_path / "result.jpg",
+    )
+
+    assert captured["kwargs"]["output_format"] == "jpeg"
+
+
+def test_generate_with_path_enforces_reference_limit(monkeypatch):
+    monkeypatch.setattr(images, "_reference_to_url", lambda value: str(value))
+
+    too_many = [f"https://example.com/{index}.png" for index in range(15)]
+    try:
+        images.generate(
+            path="doubao-5.0-lite",
+            prompt="生成",
+            references=too_many,
+        )
+    except images.AIToolkitError as exc:
+        assert "max 14" in str(exc)
+    else:
+        raise AssertionError("expected AIToolkitError for reference overflow")
+
+
+def test_generate_falls_back_to_model_capability_when_path_absent(monkeypatch, tmp_path):
+    captured = {}
+    monkeypatch.setattr(images, "create_image_generation", _fake_b64_response(captured))
+
+    # No path — but model is a known capability, so SDK still applies its rules.
+    images.generate(
+        provider="ark",
+        model="doubao-seedream-5-0-260128",
+        prompt="生成",
+        output_path=tmp_path / "out.png",
     )
 
     assert captured["kwargs"]["output_format"] == "png"

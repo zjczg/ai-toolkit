@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from ai_toolkit import capabilities
 from ai_toolkit.ark import create_image_generation
 from ai_toolkit.config import get_settings
 from ai_toolkit.gemini import generate_content
@@ -19,7 +20,7 @@ from ai_toolkit.types import ImageGenerationResult
 
 def generate(
     *,
-    provider: str,
+    provider: str | None = None,
     prompt: str,
     references: list[str | Path] | None = None,
     output_path: str | Path | None = None,
@@ -27,6 +28,7 @@ def generate(
     size: str | None = None,
     image_size: str | None = None,
     aspect_ratio: str | None = None,
+    path: str | None = None,
     **kwargs: Any,
 ) -> ImageGenerationResult:
     """Generate an image with a normalized SDK interface.
@@ -34,7 +36,30 @@ def generate(
     Local reference images are handled by the SDK:
     - ARK/Doubao: upload local files first and pass public URLs.
     - Gemini: embed local files as inline base64 image parts.
+
+    When ``path`` names a curated entry from :mod:`ai_toolkit.capabilities`
+    (for example ``"doubao-5.0-lite"`` or ``"doubao-4.5"``) the SDK fills in
+    ``provider``/``model``, validates the reference count, infers
+    ``output_format`` from ``output_path`` for models that support it, and
+    drops ``output_format`` for models that do not. Without ``path`` the call
+    is forwarded with no capability awareness, preserving the previous
+    hands-off behaviour.
     """
+    capability = capabilities.get_image_capability(path=path, model=model)
+    if capability is not None:
+        provider = provider or capability.get("provider")
+        model = model or capability.get("model")
+        constraints = capability.get("constraints", {})
+        _enforce_reference_limit(references or [], constraints, path=path)
+        kwargs = _apply_capability_to_kwargs(
+            kwargs,
+            constraints=constraints,
+            output_path=output_path,
+        )
+
+    if not provider:
+        raise AIToolkitError("provider is required (or pass path=...)")
+
     normalized_provider = normalize_provider(provider)
     if normalized_provider == "ark":
         result = _generate_ark(
@@ -103,6 +128,7 @@ def _generate_ark(
         images=images,
         raw_response=raw_response,
         request={"prompt": prompt, **payload},
+        usage=_response_usage(raw_response),
     )
     if output_path is not None:
         result.save_first(output_path)
@@ -146,6 +172,7 @@ def _generate_gemini(
         text=text,
         raw_response=raw_response,
         request={"contents": contents, **request_kwargs},
+        usage=_response_usage(raw_response),
     )
     if output_path is not None:
         result.save_first(output_path)
@@ -188,6 +215,71 @@ def _extract_ark_images(response: dict[str, Any]) -> list[GeneratedImage]:
     if not images:
         raise AIToolkitError("ARK image generation returned no images")
     return images
+
+
+def _apply_capability_to_kwargs(
+    kwargs: dict[str, Any],
+    *,
+    constraints: dict[str, Any],
+    output_path: str | Path | None,
+) -> dict[str, Any]:
+    result = dict(kwargs)
+    output_format_param = constraints.get("output_format_param")
+    if output_format_param:
+        supported = [str(value).lower() for value in constraints.get("supported_output_formats", [])]
+        if output_format_param not in result and output_path is not None:
+            inferred = _infer_output_format(output_path, supported)
+            if inferred is not None:
+                result[output_format_param] = inferred
+        elif output_format_param in result and supported:
+            value = str(result[output_format_param]).strip().lower()
+            if value in supported:
+                result[output_format_param] = value
+            else:
+                default = constraints.get("default_output_format")
+                result[output_format_param] = str(default) if default else supported[0]
+    elif constraints.get("output_format_configurable") is False:
+        result.pop("output_format", None)
+    return result
+
+
+def _infer_output_format(output_path: str | Path, supported: list[str]) -> str | None:
+    if not supported:
+        return None
+    suffix = Path(str(output_path)).suffix.lower().lstrip(".")
+    if not suffix:
+        return None
+    if suffix == "jpg":
+        suffix = "jpeg"
+    if suffix in supported:
+        return suffix
+    return None
+
+
+def _enforce_reference_limit(
+    references: list[str | Path],
+    constraints: dict[str, Any],
+    *,
+    path: str | None,
+) -> None:
+    max_refs = constraints.get("max_reference_images")
+    if max_refs is None:
+        return
+    if len(references) > max_refs:
+        label = f"path {path!r}" if path else "this model"
+        raise AIToolkitError(
+            f"too many reference images for {label}: got {len(references)}, max {max_refs}"
+        )
+
+
+def _response_usage(response: dict[str, Any]) -> dict[str, Any] | None:
+    usage = response.get("usage")
+    if isinstance(usage, dict):
+        return usage
+    usage_metadata = response.get("usageMetadata")
+    if isinstance(usage_metadata, dict):
+        return usage_metadata
+    return None
 
 
 def _extract_gemini_images_and_text(response: dict[str, Any]) -> tuple[list[GeneratedImage], str]:

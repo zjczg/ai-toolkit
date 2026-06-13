@@ -346,6 +346,39 @@ def get_image_generation_path(path: str) -> dict[str, Any]:
     return deepcopy(_IMAGE_GENERATION_PATHS[path])
 
 
+def find_image_path_by_model(model_id: str | None) -> str | None:
+    """Return the curated path id whose ``model`` equals ``model_id``, or None."""
+    if not model_id:
+        return None
+    for path, config in _IMAGE_GENERATION_PATHS.items():
+        if config.get("model") == model_id:
+            return path
+    return None
+
+
+def get_image_capability(
+    *,
+    path: str | None = None,
+    model: str | None = None,
+) -> dict[str, Any] | None:
+    """Return the curated capability for an image model.
+
+    Prefers ``path`` when given. Falls back to a reverse lookup by ``model``.
+    Returns None when neither is resolvable so callers can opt out of the
+    capability-aware path silently.
+    """
+    if path:
+        try:
+            return get_image_generation_path(path)
+        except KeyError:
+            return None
+    if model:
+        resolved = find_image_path_by_model(model)
+        if resolved is not None:
+            return get_image_generation_path(resolved)
+    return None
+
+
 def normalize_image_generation_options(
     path: str,
     options: dict[str, Any] | None = None,
@@ -430,7 +463,11 @@ def normalize_video_generation_options(
     params[duration_param] = min(30, max(1, duration))
 
     resolution_param = constraints.get("resolution_param", "resolution")
-    supported_resolutions = constraints.get("supported_resolution_values", [])
+    supported_resolutions = (
+        constraints.get("supported_resolution_values")
+        or constraints.get("recommended_resolution_values")
+        or []
+    )
     if supported_resolutions:
         resolution = str(
             params.get(resolution_param)
