@@ -8,8 +8,7 @@ from typing import Any
 from ai_toolkit.ark import create_responses
 from ai_toolkit.config import get_settings
 from ai_toolkit.deepseek import create_chat_completion
-from ai_toolkit.types import AIToolkitError
-from ai_toolkit.types import ChatCompletionResult
+from ai_toolkit.types import AIToolkitError, ChatCompletionResult
 
 
 def complete(

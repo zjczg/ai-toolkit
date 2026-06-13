@@ -41,12 +41,14 @@ export AI_TOOLKIT_HTTP_TIMEOUT_SECONDS="120"
 
 ## High-level image generation
 
+Prefer passing a curated `path` so the SDK resolves provider, model, and model-specific quirks (output_format inference, reference-count limits, dropping unsupported params):
+
 ```python
 from ai_toolkit import images
 
 result = images.generate(
-    provider="ark",
-    prompt="pixel art orange tabby cat, side view",
+    path="doubao-5.0-lite",                # or "doubao-4.5", "gemini-banano2"
+    prompt="pixel art orange tabby cat",
     references=["./base.png"],
     size="2K",
     output_path="./out.png",
@@ -54,6 +56,24 @@ result = images.generate(
 
 print(result.provider, result.model, result.first_image().local_path)
 ```
+
+When `path` is omitted, `provider`+`model` still works. If the `model` matches a curated path the SDK reverse-looks-up the capability and applies the same rules; an unknown `model` is forwarded as-is:
+
+```python
+images.generate(
+    provider="ark",
+    model="doubao-seedream-4-5-251128",
+    prompt="...",
+    output_path="./out.jpg",
+)
+```
+
+Per-model behaviour applied automatically:
+
+| path | output_format | reference cap |
+|---|---|---|
+| `doubao-5.0-lite` | inferred from `output_path` suffix (png/jpeg) | 14 |
+| `doubao-4.5` | not supported — silently dropped | per docs |
 
 Local references are handled internally:
 

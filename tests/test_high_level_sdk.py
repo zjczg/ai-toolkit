@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from ai_toolkit import __version__
-from ai_toolkit import _transport
-from ai_toolkit import capabilities
-from ai_toolkit import chat
-from ai_toolkit import images
+from ai_toolkit import __version__, _transport, capabilities, chat, images
 from ai_toolkit.chat import normalize_provider as normalize_chat_provider
 from ai_toolkit.images import normalize_provider as normalize_image_provider
-from ai_toolkit.videos import build_content
+from ai_toolkit.videos import _extract_videos, build_content
 from ai_toolkit.videos import normalize_provider as normalize_video_provider
-from ai_toolkit.videos import _extract_videos
 
 
 def test_version_is_updated():
@@ -107,7 +102,7 @@ def test_image_generation_paths_include_model_constraints():
     assert doubao["constraints"]["min_total_pixels"] == 3686400
     assert "1024x256" in doubao["constraints"]["known_invalid_size_examples"]
     assert doubao["constraints"]["fixed_pixel_export_requires_postprocess"] is True
-    assert "2048x2048" == doubao["default_params"]["size"]
+    assert doubao["default_params"]["size"] == "2048x2048"
 
     gemini = capabilities.get_image_generation_path("gemini-banano2")
     assert gemini["provider"] == "gemini"

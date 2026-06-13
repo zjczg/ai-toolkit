@@ -8,11 +8,9 @@ from __future__ import annotations
 import hashlib
 import subprocess
 from pathlib import Path
-from urllib.error import HTTPError
-from urllib.error import URLError
-from urllib.request import Request
-from urllib.request import urlopen
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from ai_toolkit.config import get_settings
 

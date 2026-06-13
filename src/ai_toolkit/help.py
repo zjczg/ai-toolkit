@@ -214,7 +214,7 @@ def help(query: str | None = None) -> None:
 
     if not matched:
         print(f"未找到匹配 '{query}' 的接口。")
-        print(f"可用的 provider: ARK, Gemini, DeepSeek, Media Tools")
+        print("可用的 provider: ARK, Gemini, DeepSeek, Media Tools")
         return
 
     current_provider = None
@@ -227,7 +227,7 @@ def help(query: str | None = None) -> None:
 
         print(f"\n  {iface['function']}()  —  {iface['endpoint']}")
         print(f"    {iface['description']}")
-        print(f"    参数:")
+        print("    参数:")
         for name, ptype, desc in iface["parameters"]:
             print(f"      {name}: {ptype}")
             print(f"        {desc}")

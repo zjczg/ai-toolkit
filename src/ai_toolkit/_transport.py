@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import http.client
+import json
 import random
 import socket
 import time
 from typing import Any
-from urllib import error
-from urllib import request
+from urllib import error, request
 
 from ai_toolkit.config import get_settings
 

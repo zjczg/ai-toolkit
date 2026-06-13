@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Any
 from urllib import parse
 
-from ai_toolkit._transport import get_json
-from ai_toolkit._transport import post_json
+from ai_toolkit._transport import get_json, post_json
 from ai_toolkit.config import get_settings
 
 

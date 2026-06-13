@@ -9,8 +9,7 @@ from urllib.parse import urlparse
 from ai_toolkit.ark import create_multimodal_embedding
 from ai_toolkit.config import get_settings
 from ai_toolkit.media import upload_public_url
-from ai_toolkit.types import AIToolkitError
-from ai_toolkit.types import EmbeddingResult
+from ai_toolkit.types import AIToolkitError, EmbeddingResult
 
 
 def generate(

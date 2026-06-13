@@ -5,7 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-
 _PROVIDERS: dict[str, dict[str, Any]] = {
     "ark": {
         "name": "ARK / Doubao",

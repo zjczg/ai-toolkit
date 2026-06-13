@@ -9,15 +9,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from ai_toolkit.ark import create_video_generation_task
-from ai_toolkit.ark import get_video_generation_task
+from ai_toolkit.ark import create_video_generation_task, get_video_generation_task
 from ai_toolkit.config import get_settings
 from ai_toolkit.media import upload_public_url
-from ai_toolkit.types import AIToolkitError
-from ai_toolkit.types import GeneratedVideo
-from ai_toolkit.types import VideoGenerationResult
-from ai_toolkit.types import VideoGenerationTask
-
+from ai_toolkit.types import (
+    AIToolkitError,
+    GeneratedVideo,
+    VideoGenerationResult,
+    VideoGenerationTask,
+)
 
 SUCCEEDED_STATUSES = {"succeeded", "success", "completed", "complete"}
 FAILED_STATUSES = {"failed", "error", "canceled", "cancelled", "expired"}
