@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from ai_toolkit.ark import create_responses
 from ai_toolkit.config import get_settings
 from ai_toolkit.deepseek import create_chat_completion
+from ai_toolkit.media import upload_public_url
 from ai_toolkit.types import AIToolkitError, ChatCompletionResult
 
 
@@ -44,6 +47,12 @@ def complete_json(
 
     For ARK Responses API this uses the official `text.format` field and,
     by default, disables deep thinking for short extraction tasks.
+
+    When ``schema`` is provided, the parsed JSON is checked against a small
+    subset of JSON Schema (``type``, ``required``, top-level property types).
+    On mismatch the SDK keeps ``result.text``, sets ``result.parsed_json`` to
+    ``None`` and ``result.schema_error`` to a human-readable reason — callers
+    can decide whether to retry, fall back, or surface the error.
     """
     normalized_provider = normalize_provider(provider)
     request_kwargs = dict(kwargs)
@@ -66,19 +75,42 @@ def complete_json(
         model=model,
         **request_kwargs,
     )
-    result.parsed_json = _parse_json(result.text)
+    parsed = _parse_json(result.text)
+    if schema is not None and parsed is not None:
+        error = _validate_against_schema(parsed, schema)
+        if error is not None:
+            result.parsed_json = None
+            result.schema_error = error
+            return result
+    result.parsed_json = parsed
     return result
 
 
 def multimodal_user_message(
     *,
     text: str,
-    images: list[str] | tuple[str, ...] = (),
+    images: list[str | Path] | tuple[str | Path, ...] = (),
 ) -> dict[str, Any]:
-    """Build a Responses-compatible user message with text and image URLs."""
+    """Build a Responses-compatible user message with text and image URLs.
+
+    Local file paths are uploaded via ``media.upload_public_url`` and replaced
+    with the resulting public URL, mirroring ``images.generate`` behaviour for
+    ARK references. HTTP(S) URLs are passed through unchanged.
+    """
     content: list[dict[str, str]] = [{"type": "input_text", "text": text}]
-    content.extend({"type": "input_image", "image_url": str(image)} for image in images)
+    content.extend(
+        {"type": "input_image", "image_url": _image_reference_to_url(image)}
+        for image in images
+    )
     return {"role": "user", "content": content}
+
+
+def _image_reference_to_url(reference: str | Path) -> str:
+    value = str(reference)
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return value
+    return upload_public_url(value)
 
 
 def normalize_provider(provider: str) -> str:
@@ -106,6 +138,56 @@ def _ark_text_format(
             "schema": schema,
         }
     }
+
+
+_JSON_TYPE_CHECKS: dict[str, tuple[type, ...]] = {
+    "object": (dict,),
+    "array": (list,),
+    "string": (str,),
+    "integer": (int,),
+    "boolean": (bool,),
+    "null": (type(None),),
+}
+
+
+def _validate_against_schema(value: Any, schema: dict[str, Any]) -> str | None:
+    """Minimal JSON-Schema-style validator. Returns an error string or None.
+
+    Only covers what high-level callers actually use: top-level ``type``,
+    ``required`` keys, and the ``type`` of each declared property. Nested
+    schemas and refs are out of scope — wrap a real validator if you need them.
+    """
+    expected_type = schema.get("type")
+    if isinstance(expected_type, str) and not _matches_type(value, expected_type):
+        return f"expected JSON {expected_type}, got {type(value).__name__}"
+
+    if expected_type != "object" or not isinstance(value, dict):
+        return None
+
+    for required_key in schema.get("required", []) or []:
+        if required_key not in value:
+            return f"missing required key {required_key!r}"
+
+    properties = schema.get("properties") or {}
+    for key, property_schema in properties.items():
+        if key not in value or not isinstance(property_schema, dict):
+            continue
+        property_type = property_schema.get("type")
+        if isinstance(property_type, str) and not _matches_type(value[key], property_type):
+            return f"property {key!r} expected {property_type}, got {type(value[key]).__name__}"
+
+    return None
+
+
+def _matches_type(value: Any, expected: str) -> bool:
+    if expected == "number":
+        return isinstance(value, int | float) and not isinstance(value, bool)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    types = _JSON_TYPE_CHECKS.get(expected)
+    if types is None:
+        return True
+    return isinstance(value, types)
 
 
 def _parse_json(text: str) -> Any | None:

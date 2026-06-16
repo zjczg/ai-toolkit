@@ -6,7 +6,7 @@ provide normalized SDK-style calls:
     from ai_toolkit import images, chat, capabilities
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from ai_toolkit import capabilities, chat, embeddings, images, videos
 from ai_toolkit.ark import (

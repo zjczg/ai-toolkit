@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- `chat.multimodal_user_message` now auto-uploads local file paths via `media.upload_public_url`, mirroring `images.generate` reference handling. HTTP(S) URLs still pass through unchanged.
+- `chat.complete_json` validates `parsed_json` against the provided `schema` (top-level `type`, `required`, declared property types). On mismatch it clears `parsed_json` and surfaces a human-readable `schema_error` on `ChatCompletionResult`.
+- `ChatCompletionResult` gained a new `schema_error: str | None` field for the above. Existing callers that only read `parsed_json` and `text` are unaffected.
+
 ## 0.3.0
 
 - `images.generate` now accepts a curated `path` (e.g. `"doubao-5.0-lite"`, `"doubao-4.5"`) that resolves provider, model, and applies model-specific constraints.

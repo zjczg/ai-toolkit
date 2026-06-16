@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from ai_toolkit import __version__, _transport, capabilities, chat, images
 from ai_toolkit.chat import normalize_provider as normalize_chat_provider
 from ai_toolkit.images import normalize_provider as normalize_image_provider
@@ -8,7 +10,7 @@ from ai_toolkit.videos import normalize_provider as normalize_video_provider
 
 
 def test_version_is_updated():
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0"
 
 
 def test_provider_aliases():
@@ -41,6 +43,24 @@ def test_multimodal_user_message_builds_responses_input():
             {"type": "input_image", "image_url": "https://example.com/item.png"},
         ],
     }
+
+
+def test_multimodal_user_message_uploads_local_files(monkeypatch, tmp_path):
+    local = tmp_path / "garment.png"
+    local.write_bytes(b"\x89PNG\r\n\x1a\n")
+    monkeypatch.setattr(
+        chat,
+        "upload_public_url",
+        lambda value: f"https://uploads.example.com/{Path(value).name}",
+    )
+
+    message = chat.multimodal_user_message(
+        text="describe",
+        images=[local, "https://cdn.example.com/already.png"],
+    )
+
+    assert message["content"][1]["image_url"] == f"https://uploads.example.com/{local.name}"
+    assert message["content"][2]["image_url"] == "https://cdn.example.com/already.png"
 
 
 def test_ark_complete_json_uses_responses_structured_output(monkeypatch):
@@ -81,6 +101,79 @@ def test_ark_complete_json_uses_responses_structured_output(monkeypatch):
         }
     }
     assert captured["kwargs"]["max_output_tokens"] == 64
+
+
+def test_complete_json_rejects_payload_that_misses_required_key(monkeypatch):
+    monkeypatch.setattr(
+        chat,
+        "create_responses",
+        lambda model, input, **kwargs: {"output_text": '{"unrelated":"value"}'},
+    )
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "required": ["name"],
+    }
+
+    result = chat.complete_json(
+        provider="ark",
+        model="doubao-seed-2-0-pro-260215",
+        messages=[{"role": "user", "content": "x"}],
+        schema=schema,
+    )
+
+    assert result.parsed_json is None
+    assert result.schema_error is not None
+    assert "name" in result.schema_error
+
+
+def test_complete_json_rejects_payload_with_wrong_property_type(monkeypatch):
+    monkeypatch.setattr(
+        chat,
+        "create_responses",
+        lambda model, input, **kwargs: {"output_text": '{"name":123}'},
+    )
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "required": ["name"],
+    }
+
+    result = chat.complete_json(
+        provider="ark",
+        model="doubao-seed-2-0-pro-260215",
+        messages=[{"role": "user", "content": "x"}],
+        schema=schema,
+    )
+
+    assert result.parsed_json is None
+    assert result.schema_error is not None
+    assert "name" in result.schema_error
+
+
+def test_complete_json_accepts_payload_that_matches_schema(monkeypatch):
+    monkeypatch.setattr(
+        chat,
+        "create_responses",
+        lambda model, input, **kwargs: {
+            "output_text": '{"name":"深蓝色双肩包","extra":42}'
+        },
+    )
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "required": ["name"],
+    }
+
+    result = chat.complete_json(
+        provider="ark",
+        model="doubao-seed-2-0-pro-260215",
+        messages=[{"role": "user", "content": "x"}],
+        schema=schema,
+    )
+
+    assert result.parsed_json == {"name": "深蓝色双肩包", "extra": 42}
+    assert result.schema_error is None
 
 
 def test_image_generation_paths_include_model_constraints():

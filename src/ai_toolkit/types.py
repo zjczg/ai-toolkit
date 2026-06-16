@@ -165,6 +165,7 @@ class ChatCompletionResult:
     model: str
     text: str
     parsed_json: Any | None = None
+    schema_error: str | None = None
     raw_response: dict[str, Any] | None = None
     request: dict[str, Any] | None = None
     usage: dict[str, Any] | None = None
