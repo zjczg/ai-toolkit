@@ -12,6 +12,7 @@ Required as needed:
 
 ```bash
 export ARK_API_KEY="..."
+export DASHSCOPE_API_KEY="..."   # 万相 / 通义 (阿里百炼)
 export GEMINI_API_KEY="..."
 export DEEPSEEK_API_KEY="..."
 
@@ -27,6 +28,8 @@ Optional defaults:
 export ARK_IMAGE_MODEL="doubao-seedream-5-0-260128"
 export ARK_IMAGE_SIZE="2K"
 export ARK_VIDEO_MODEL="doubao-seedance-2-0-260128"
+export DASHSCOPE_IMAGE_MODEL="wan2.7-image"
+export DASHSCOPE_IMAGE_SIZE="2K"
 export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image-preview"
 export GEMINI_IMAGE_SIZE="1K"
 export DEEPSEEK_CHAT_MODEL="deepseek-v4-flash"
@@ -74,11 +77,31 @@ Per-model behaviour applied automatically:
 |---|---|---|
 | `doubao-5.0-lite` | inferred from `output_path` suffix (png/jpeg) | 14 |
 | `doubao-4.5` | not supported — silently dropped | per docs |
+| `wan2.7-image` / `wan2.7-image-pro` | not configurable | 5 |
 
 Local references are handled internally:
 
 - `ark` / Doubao uploads local files and passes public URLs.
+- `dashscope` / 万相 uploads local files and passes public URLs.
 - `gemini` embeds local files as inline base64 parts.
+
+### 万相 / 通义 (阿里百炼 DashScope)
+
+万相 runs on a **different platform** from ARK/Doubao — it needs its own `DASHSCOPE_API_KEY`. The toolkit uses the synchronous `multimodal-generation` endpoint, so calls return image URLs directly (no task polling). Provider aliases: `wan`, `wanx`, `万相`, `dashscope`, `bailian`, `qwen-image`.
+
+```python
+from ai_toolkit import images
+
+result = images.generate(
+    path="wan2.7-image-pro",               # or "wan2.7-image"
+    prompt="一只橙色虎斑猫的工笔画",
+    size="2K",                              # "1K"/"2K"/"4K" or "1024*1024" (separator is *, not x)
+    output_path="./out.png",
+)
+print(result.provider, result.model, result.first_image().local_path)
+```
+
+> Note: only the modern sync Wan/Qwen models (`wan2.7-image`, `wan2.7-image-pro`, `wan2.6-image`, `qwen-image`) are wired here. The legacy async-only series (`wanx2.1-t2i`, `wan2.2-t2i-*`) uses a different task-polling endpoint and is out of scope. DashScope output URLs expire after 24 hours.
 
 ## High-level video generation
 

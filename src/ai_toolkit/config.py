@@ -44,6 +44,14 @@ class Settings:
         default_factory=lambda: os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image-preview")
     )
     gemini_image_size: str = field(default_factory=lambda: os.getenv("GEMINI_IMAGE_SIZE", "1K"))
+    dashscope_api_key: str = field(default_factory=lambda: os.getenv("DASHSCOPE_API_KEY", ""))
+    dashscope_base_url: str = field(
+        default_factory=lambda: os.getenv("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com")
+    )
+    dashscope_image_model: str = field(
+        default_factory=lambda: os.getenv("DASHSCOPE_IMAGE_MODEL", "wan2.7-image")
+    )
+    dashscope_image_size: str = field(default_factory=lambda: os.getenv("DASHSCOPE_IMAGE_SIZE", "2K"))
     ark_response_model: str = field(
         default_factory=lambda: os.getenv("ARK_RESPONSE_MODEL", "doubao-seed-2-0-pro-260215")
     )

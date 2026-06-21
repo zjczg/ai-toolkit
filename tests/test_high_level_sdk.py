@@ -10,12 +10,16 @@ from ai_toolkit.videos import normalize_provider as normalize_video_provider
 
 
 def test_version_is_updated():
-    assert __version__ == "0.4.0"
+    assert __version__ == "0.5.0"
 
 
 def test_provider_aliases():
     assert normalize_image_provider("doubao") == "ark"
     assert normalize_image_provider("google") == "gemini"
+    assert normalize_image_provider("wan") == "dashscope"
+    assert normalize_image_provider("wanx") == "dashscope"
+    assert normalize_image_provider("万相") == "dashscope"
+    assert normalize_image_provider("qwen-image") == "dashscope"
     assert normalize_chat_provider("doubao") == "ark"
     assert normalize_video_provider("seedance") == "ark"
 
@@ -26,6 +30,7 @@ def test_capabilities_include_current_tools():
     assert "chat.complete" in capabilities.list_tools()
     assert "chat.complete_json" in capabilities.list_tools()
     assert "ark" in capabilities.get_tool_spec("images.generate")["providers"]
+    assert "dashscope" in capabilities.get_tool_spec("images.generate")["providers"]
     assert "ark" in capabilities.get_tool_spec("videos.generate")["providers"]
     assert "deepseek" in capabilities.get_tool_spec("chat.complete")["providers"]
     assert "ark" in capabilities.get_tool_spec("chat.complete_json")["providers"]
@@ -417,6 +422,67 @@ def test_video_content_builder_keeps_raw_content_and_reference_roles():
     assert content[2]["role"] == "reference_video"
     assert content[3]["type"] == "audio_url"
     assert content[3]["role"] == "reference_audio"
+
+
+def test_dashscope_image_generation_extracts_choice_image_and_uploads_refs(monkeypatch):
+    captured = {}
+
+    def fake_create_dashscope(model, prompt, *, image_urls=None, **parameters):
+        captured["model"] = model
+        captured["prompt"] = prompt
+        captured["image_urls"] = image_urls
+        captured["parameters"] = parameters
+        return {
+            "output": {
+                "choices": [
+                    {
+                        "message": {
+                            "content": [
+                                {"type": "image", "image": "https://dashscope.example/out.png"}
+                            ]
+                        }
+                    }
+                ]
+            },
+            "usage": {"image_count": 1, "size": "1488*704"},
+        }
+
+    monkeypatch.setattr(images, "create_dashscope_image_generation", fake_create_dashscope)
+    monkeypatch.setattr(
+        images, "_reference_to_url", lambda value: f"https://uploads.example/{value}"
+    )
+
+    result = images.generate(
+        provider="wan",
+        prompt="生成一张图",
+        references=["local.png"],
+    )
+
+    assert result.provider == "dashscope"
+    assert result.model == "wan2.7-image"
+    assert result.images[0].url == "https://dashscope.example/out.png"
+    assert result.usage == {"image_count": 1, "size": "1488*704"}
+    assert captured["image_urls"] == ["https://uploads.example/local.png"]
+    assert captured["parameters"]["size"] == "2K"
+    assert captured["parameters"]["watermark"] is False
+
+
+def test_dashscope_extractor_supports_legacy_results_shape():
+    response = {"output": {"results": [{"url": "https://dashscope.example/legacy.png"}]}}
+    extracted = images._extract_dashscope_images(response)
+    assert extracted[0].url == "https://dashscope.example/legacy.png"
+
+
+def test_dashscope_image_paths_resolve_provider_and_constraints():
+    paths = capabilities.list_image_generation_paths()
+    assert {"wan2.7-image", "wan2.7-image-pro"} <= set(paths)
+
+    wan = capabilities.get_image_generation_path("wan2.7-image-pro")
+    assert wan["provider"] == "dashscope"
+    assert wan["model"] == "wan2.7-image-pro"
+    assert wan["constraints"]["output_format_configurable"] is False
+    assert wan["constraints"]["max_reference_images"] == 5
+    assert capabilities.find_image_path_by_model("wan2.7-image") == "wan2.7-image"
 
 
 def test_video_result_extraction_supports_common_task_shapes():

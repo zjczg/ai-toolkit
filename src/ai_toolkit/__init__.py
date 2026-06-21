@@ -6,7 +6,7 @@ provide normalized SDK-style calls:
     from ai_toolkit import images, chat, capabilities
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 from ai_toolkit import capabilities, chat, embeddings, images, videos
 from ai_toolkit.ark import (
@@ -23,6 +23,8 @@ from ai_toolkit.ark import (
     get_video_generation_task,
 )
 from ai_toolkit.config import Settings, get_settings
+from ai_toolkit.dashscope import DashScopeImageError
+from ai_toolkit.dashscope import create_image_generation as create_dashscope_image_generation
 from ai_toolkit.deepseek import DeepSeekError, create_chat_completion
 from ai_toolkit.gemini import GeminiImageError, generate_content
 from ai_toolkit.help import help, list_interfaces
@@ -66,6 +68,9 @@ __all__ = [
     "create_responses",
     "create_video_generation_task",
     "get_video_generation_task",
+    # DashScope (万相 / 通义)
+    "DashScopeImageError",
+    "create_dashscope_image_generation",
     # Gemini
     "GeminiImageError",
     "generate_content",

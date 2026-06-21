@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from ai_toolkit import capabilities
 from ai_toolkit.ark import create_image_generation
 from ai_toolkit.config import get_settings
+from ai_toolkit.dashscope import create_image_generation as create_dashscope_image_generation
 from ai_toolkit.gemini import generate_content
 from ai_toolkit.media import upload_public_url
 from ai_toolkit.types import AIToolkitError, GeneratedImage, ImageGenerationResult
@@ -68,6 +69,15 @@ def generate(
             size=size,
             **kwargs,
         )
+    elif normalized_provider == "dashscope":
+        result = _generate_dashscope(
+            prompt=prompt,
+            references=references or [],
+            output_path=output_path,
+            model=model,
+            size=size,
+            **kwargs,
+        )
     elif normalized_provider == "gemini":
         result = _generate_gemini(
             prompt=prompt,
@@ -88,6 +98,8 @@ def normalize_provider(provider: str) -> str:
     value = provider.strip().lower()
     if value in {"ark", "doubao", "volcengine", "seedream"}:
         return "ark"
+    if value in {"dashscope", "bailian", "wan", "wanx", "wanxiang", "万相", "qwen-image"}:
+        return "dashscope"
     if value in {"gemini", "google"}:
         return "gemini"
     return value
@@ -126,6 +138,45 @@ def _generate_ark(
         images=images,
         raw_response=raw_response,
         request={"prompt": prompt, **payload},
+        usage=_response_usage(raw_response),
+    )
+    if output_path is not None:
+        result.save_first(output_path)
+    return result
+
+
+def _generate_dashscope(
+    *,
+    prompt: str,
+    references: list[str | Path],
+    output_path: str | Path | None,
+    model: str | None,
+    size: str | None,
+    **kwargs: Any,
+) -> ImageGenerationResult:
+    settings = get_settings()
+    resolved_model = model or settings.dashscope_image_model
+    parameters: dict[str, Any] = {
+        "size": size or settings.dashscope_image_size,
+        "watermark": False,
+    }
+    parameters.update(kwargs)
+
+    image_urls = [_reference_to_url(ref) for ref in references]
+    raw_response = create_dashscope_image_generation(
+        resolved_model,
+        prompt,
+        image_urls=image_urls or None,
+        **parameters,
+    )
+    images = _extract_dashscope_images(raw_response)
+    result = ImageGenerationResult(
+        provider="dashscope",
+        model=resolved_model,
+        prompt=prompt,
+        images=images,
+        raw_response=raw_response,
+        request={"prompt": prompt, "image_urls": image_urls, "parameters": parameters},
         usage=_response_usage(raw_response),
     )
     if output_path is not None:
@@ -212,6 +263,30 @@ def _extract_ark_images(response: dict[str, Any]) -> list[GeneratedImage]:
                                          b64_json=b64_json if isinstance(b64_json, str) else None))
     if not images:
         raise AIToolkitError("ARK image generation returned no images")
+    return images
+
+
+def _extract_dashscope_images(response: dict[str, Any]) -> list[GeneratedImage]:
+    images: list[GeneratedImage] = []
+    output = response.get("output", {}) if isinstance(response, dict) else {}
+
+    # Synchronous multimodal-generation shape:
+    # output.choices[].message.content[].image
+    for choice in output.get("choices", []) or []:
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message", {}) if isinstance(choice.get("message"), dict) else {}
+        for part in message.get("content", []) or []:
+            if isinstance(part, dict) and isinstance(part.get("image"), str):
+                images.append(GeneratedImage(url=part["image"]))
+
+    # Async/legacy task shape fallback: output.results[].url
+    for item in output.get("results", []) or []:
+        if isinstance(item, dict) and isinstance(item.get("url"), str):
+            images.append(GeneratedImage(url=item["url"]))
+
+    if not images:
+        raise AIToolkitError("DashScope image generation returned no images")
     return images
 
 

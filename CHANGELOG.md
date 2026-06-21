@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Added 万相 / 通义 (阿里百炼 DashScope) as an image generation provider, separate from ARK/Doubao. Set `DASHSCOPE_API_KEY` (plus optional `DASHSCOPE_BASE_URL`, `DASHSCOPE_IMAGE_MODEL`, `DASHSCOPE_IMAGE_SIZE`).
+- New low-level wrapper `ai_toolkit.dashscope.create_image_generation` (exported as `create_dashscope_image_generation`) for the synchronous `multimodal-generation` endpoint — returns image URLs directly, no task polling.
+- `images.generate` accepts the new provider via aliases `wan` / `wanx` / `万相` / `dashscope` / `bailian` / `qwen-image`, and curated paths `wan2.7-image` and `wan2.7-image-pro`. Local references are uploaded to public URLs like the ARK path.
+- Only modern sync Wan/Qwen models are wired; legacy async-only `wanx2.1-t2i` / `wan2.2-t2i-*` (task-polling endpoint) are intentionally out of scope.
+
 ## 0.4.0
 
 - `chat.multimodal_user_message` now auto-uploads local file paths via `media.upload_public_url`, mirroring `images.generate` reference handling. HTTP(S) URLs still pass through unchanged.

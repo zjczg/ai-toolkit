@@ -124,6 +124,27 @@ _INTERFACES: list[InterfaceSpec] = [
             ("task_id", "str", "必填 — create_video_generation_task 返回的任务 ID"),
         ],
     },
+    # -- 万相 / 通义 (阿里百炼 DashScope) Image Generation ---------------------
+    {
+        "provider": "万相 / 通义 (阿里百炼 DashScope)",
+        "endpoint": "POST /api/v1/services/aigc/multimodal-generation/generation",
+        "function": "create_dashscope_image_generation",
+        "description": (
+            "万相/通义文生图（同步）— 返回原始 JSON。"
+            "生成图片在 output.choices[0].message.content[].image，链接 24 小时过期。"
+            "覆盖 wan2.7-image / wan2.7-image-pro / wan2.6-image / qwen-image 等现代模型；"
+            "老的 wanx2.1-t2i / wan2.2-t2i 异步系列不在此封装内。"
+        ),
+        "parameters": [
+            ("model", "str", "必填 — 模型名，如 wan2.7-image、wan2.7-image-pro、qwen-image"),
+            ("prompt", "str", "必填 — 图片描述文本"),
+            ("image_urls", "list[str]", "可选 — 参考图公网 URL 数组，单张为图生图/编辑，多张为多图参考"),
+            ("size", "str", '可选 (kwargs/parameters) — "1K"/"2K"/"4K" 或自定义 "1024*1024"（注意分隔符是 * 不是 x）'),
+            ("n", "int", "可选 (kwargs/parameters) — 生成图片数量"),
+            ("watermark", "bool", "可选 (kwargs/parameters) — 是否添加水印，默认 False"),
+            ("prompt_extend", "bool", "可选 (kwargs/parameters) — 是否开启智能改写以增强效果"),
+        ],
+    },
     # -- Gemini Image Generation ----------------------------------------------
     {
         "provider": "Gemini (Google)",
@@ -214,7 +235,7 @@ def help(query: str | None = None) -> None:
 
     if not matched:
         print(f"未找到匹配 '{query}' 的接口。")
-        print("可用的 provider: ARK, Gemini, DeepSeek, Media Tools")
+        print("可用的 provider: ARK, 万相/通义 (DashScope), Gemini, DeepSeek, Media Tools")
         return
 
     current_provider = None
