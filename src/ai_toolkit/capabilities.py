@@ -1,4 +1,4 @@
-"""Capability registry for ai_toolkit high-level tools."""
+"""Capability registry for the platform-scoped ai_toolkit SDK."""
 
 from __future__ import annotations
 
@@ -9,147 +9,106 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
     "ark": {
         "name": "ARK / Doubao",
         "tools": [
-            "images.generate",
-            "videos.generate",
-            "chat.complete",
-            "chat.complete_json",
-            "embeddings.generate",
+            "ark.images.generate",
+            "ark.videos.generate",
+            "ark.text.complete",
+            "ark.text.complete_json",
+            "ark.embeddings.generate",
         ],
         "env": ["ARK_API_KEY"],
     },
+    "dashscope": {
+        "name": "DashScope / Wan",
+        "tools": ["dashscope.images.generate"],
+        "env": ["DASHSCOPE_API_KEY"],
+    },
     "gemini": {
         "name": "Gemini",
-        "tools": ["images.generate"],
+        "tools": ["gemini.images.generate"],
         "env": ["GEMINI_API_KEY"],
-    },
-    "dashscope": {
-        "name": "万相 / 通义 (阿里百炼 DashScope)",
-        "tools": ["images.generate"],
-        "env": ["DASHSCOPE_API_KEY"],
     },
     "deepseek": {
         "name": "DeepSeek",
-        "tools": ["chat.complete", "chat.complete_json"],
+        "tools": ["deepseek.text.complete", "deepseek.text.complete_json"],
         "env": ["DEEPSEEK_API_KEY"],
-    },
-    "media": {
-        "name": "Media Upload",
-        "tools": ["media.upload_public_url"],
-        "env": ["UPLOAD_SSH_TARGET", "UPLOAD_REMOTE_DIR", "UPLOAD_PUBLIC_BASE_URL"],
     },
 }
 
 _TOOL_SPECS: dict[str, dict[str, Any]] = {
-    "images.generate": {
-        "description": "Generate an image from text and optional references.",
-        "providers": {
-            "ark": {
-                "default_model_env": "ARK_IMAGE_MODEL",
-                "default_model": "doubao-seedream-5-0-260128",
-                "reference_mode": "public_url_upload_for_local_files",
-                "default_params": {
-                    "size": "2K",
-                    "output_format": "png",
-                    "response_format": "url",
-                    "sequential_image_generation": "disabled",
-                    "stream": False,
-                    "watermark": False,
-                },
-            },
-            "gemini": {
-                "default_model_env": "GEMINI_IMAGE_MODEL",
-                "default_model": "gemini-3.1-flash-image-preview",
-                "reference_mode": "inline_base64_for_local_files",
-                "default_params": {
-                    "generationConfig": {
-                        "responseModalities": ["TEXT", "IMAGE"],
-                        "imageConfig": {"imageSize": "1K"},
-                    }
-                },
-            },
-            "dashscope": {
-                "default_model_env": "DASHSCOPE_IMAGE_MODEL",
-                "default_model": "wan2.7-image",
-                "endpoint": "POST /api/v1/services/aigc/multimodal-generation/generation",
-                "reference_mode": "public_url_upload_for_local_files",
-                "default_params": {
-                    "size": "2K",
-                    "watermark": False,
-                },
-            },
+    "ark.images.generate": {
+        "description": "Generate images with ARK Seedream models.",
+        "models": ["seedream-5-lite", "seedream-4.5"],
+        "reference_mode": "public_url_upload_for_local_files",
+        "default_params": {
+            "size": "2K",
+            "response_format": "url",
+            "sequential_image_generation": "disabled",
+            "stream": False,
+            "watermark": False,
         },
     },
-    "chat.complete": {
-        "description": "Generate text from messages or a prompt.",
-        "providers": {
-            "deepseek": {
-                "default_model_env": "DEEPSEEK_CHAT_MODEL",
-                "default_model": "deepseek-v4-flash",
-                "default_params": {},
-            },
-            "ark": {
-                "default_model_env": "ARK_RESPONSE_MODEL",
-                "default_model": "doubao-seed-2-0-pro-260215",
-                "default_params": {},
-            },
+    "ark.videos.generate": {
+        "description": "Submit and optionally wait for ARK Seedance video generation.",
+        "models": ["seedance-2"],
+        "default_params": {
+            "ratio": "1:1",
+            "duration": 5,
+            "resolution": "720p",
+            "watermark": False,
+            "generate_audio": False,
         },
     },
-    "chat.complete_json": {
-        "description": "Generate structured JSON from messages or a prompt.",
-        "providers": {
-            "deepseek": {
-                "default_model_env": "DEEPSEEK_CHAT_MODEL",
-                "default_model": "deepseek-v4-flash",
-                "default_params": {
-                    "response_format": {"type": "json_object"},
-                    "thinking": {"type": "disabled"},
-                },
-            },
-            "ark": {
-                "default_model_env": "ARK_RESPONSE_MODEL",
-                "default_model": "doubao-seed-2-0-pro-260215",
-                "endpoint": "POST /responses",
-                "default_params": {
-                    "thinking": {"type": "disabled"},
-                    "text": {"format": {"type": "json_object"}},
-                },
-            },
+    "ark.text.complete": {
+        "description": "Generate text or multimodal text with ARK Responses API.",
+        "models": ["doubao-pro"],
+        "default_params": {},
+    },
+    "ark.text.complete_json": {
+        "description": "Generate structured JSON with ARK Responses API.",
+        "models": ["doubao-pro"],
+        "default_params": {
+            "thinking": {"type": "disabled"},
+            "text": {"format": {"type": "json_object"}},
         },
     },
-    "embeddings.generate": {
-        "description": "Generate multimodal embeddings from text and/or image references.",
-        "providers": {
-            "ark": {
-                "default_model_env": "ARK_EMBEDDING_MODEL",
-                "default_model": "doubao-embedding-vision-251215",
-                "reference_mode": "public_url_upload_for_local_files",
-                "default_params": {},
-            },
-        },
+    "ark.embeddings.generate": {
+        "description": "Generate ARK multimodal embeddings.",
+        "models": ["doubao-vision"],
+        "default_params": {"dimensions": None},
     },
-    "videos.generate": {
-        "description": "Submit and optionally poll an asynchronous video generation task.",
-        "providers": {
-            "ark": {
-                "default_model_env": "ARK_VIDEO_MODEL",
-                "default_model": "doubao-seedance-2-0-260128",
-                "endpoint": "POST /contents/generations/tasks",
-                "query_endpoint": "GET /contents/generations/tasks/{task_id}",
-                "reference_mode": "public_url_upload_for_local_files",
-                "default_params": {
-                    "watermark": False,
-                    "generate_audio": False,
-                },
-            },
+    "dashscope.images.generate": {
+        "description": "Generate images with DashScope Wan models.",
+        "models": ["wan2.7", "wan2.7-pro"],
+        "reference_mode": "public_url_upload_for_local_files",
+        "default_params": {"size": "2K", "watermark": False},
+    },
+    "gemini.images.generate": {
+        "description": "Generate images with Gemini image models.",
+        "models": ["gemini-image"],
+        "reference_mode": "inline_base64_for_local_files",
+        "default_params": {"image_size": "2K", "aspect_ratio": "1:1"},
+    },
+    "deepseek.text.complete": {
+        "description": "Generate text with DeepSeek.",
+        "models": ["v4-flash", "v4-pro"],
+        "default_params": {},
+    },
+    "deepseek.text.complete_json": {
+        "description": "Generate structured JSON with DeepSeek.",
+        "models": ["v4-flash", "v4-pro"],
+        "default_params": {
+            "response_format": {"type": "json_object"},
+            "thinking": {"type": "disabled"},
         },
     },
 }
 
-_IMAGE_GENERATION_PATHS: dict[str, dict[str, Any]] = {
-    "doubao-5.0-lite": {
-        "label": "doubao-5.0-lite",
+_IMAGE_MODELS: dict[str, dict[str, Any]] = {
+    "seedream-5-lite": {
         "provider": "ark",
+        "tool": "ark.images.generate",
         "model": "doubao-seedream-5-0-260128",
+        "aliases": ["seedream-5.0-lite", "doubao-5.0-lite"],
         "default_params": {
             "size": "2K",
             "output_format": "png",
@@ -159,162 +118,69 @@ _IMAGE_GENERATION_PATHS: dict[str, dict[str, Any]] = {
             "watermark": False,
         },
         "constraints": {
-            "generation_size_param": "size",
             "supported_size_values": ["2K", "3K", "4K", "<width>x<height>"],
-            "default_size": "2K",
-            "supports_arbitrary_small_size": False,
-            "min_total_pixels": 3686400,
-            "min_total_pixels_hint": "2560x1440",
-            "max_total_pixels": 16777216,
-            "max_total_pixels_hint": "4096x4096",
-            "aspect_ratio_range": "[1/16, 16]",
-            "fixed_pixel_export_requires_postprocess": True,
-            "output_format_param": "output_format",
             "supported_output_formats": ["png", "jpeg"],
-            "default_output_format": "png",
             "max_reference_images": 14,
-            "supported_input_formats": [
-                "jpeg",
-                "png",
-                "webp",
-                "bmp",
-                "tiff",
-                "gif",
-                "heic",
-                "heif",
-            ],
-            "supports_web_search_tool": True,
-            "sequential_max_images": 15,
+            "fixed_pixel_export_requires_postprocess": True,
         },
-        "notes": [
-            "Seedream 5.0 lite uses the same ARK /images/generations endpoint as 4.5 and supports text, single-image, and multi-image generation.",
-            "Use output_format=png or jpeg when the caller needs the generated file format to match a local suffix.",
-            "The web_search tool is available but should be enabled only for time-sensitive visual content.",
-            "For fixed small final assets, generate within documented pixel limits and post-process deterministically.",
-        ],
-        "source_urls": [
-            "https://www.volcengine.com/docs/6791/1541523",
-            "https://www.volcengine.com/docs/82379/1824692",
-        ],
-        "last_verified": "2026-06-08",
+        "last_smoke_tested": "2026-06-29",
     },
-    "doubao-4.5": {
-        "label": "doubao-4.5",
+    "seedream-4.5": {
         "provider": "ark",
+        "tool": "ark.images.generate",
         "model": "doubao-seedream-4-5-251128",
+        "aliases": ["doubao-4.5"],
         "default_params": {
-            "size": "2048x2048",
+            "size": "2K",
             "response_format": "url",
             "sequential_image_generation": "disabled",
             "stream": False,
             "watermark": False,
         },
         "constraints": {
-            "generation_size_param": "size",
             "supported_size_values": ["2K", "4K", "<width>x<height>"],
-            "default_size": "2048x2048",
-            "supports_arbitrary_small_size": False,
-            "min_total_pixels": 3686400,
-            "min_total_pixels_hint": "2560x1440",
-            "max_total_pixels_hint": "4096x4096",
-            "aspect_ratio_range": "[1/16, 16]",
-            "known_invalid_size_examples": ["1024x256", "2048x512"],
-            "fixed_pixel_export_requires_postprocess": True,
-            "output_format": "jpeg",
             "output_format_configurable": False,
+            "native_output_format": "jpeg",
+            "fixed_pixel_export_requires_postprocess": True,
         },
-        "notes": [
-            "Use the size parameter for generation resolution or aspect-ratio-derived dimensions.",
-            "Custom WxH must meet Seedream 4.5 pixel limits; small sprite strips such as 1024x256 should be generated larger and post-processed.",
-            "Small final assets such as 200x200 should be produced by deterministic post-processing.",
-            "Seedream 4.5 returns jpeg images by default and does not support output_format override.",
-        ],
-        "source_urls": [
-            "https://www.volcengine.com/docs/6492/2172373?lang=zh",
-            "https://www.volcengine.com/docs/6492/2221472?lang=zh",
-        ],
-        "last_verified": "2026-05-20",
+        "last_smoke_tested": "2026-06-29",
     },
-    "wan2.7-image": {
-        "label": "wan2.7-image (万相)",
+    "wan2.7": {
         "provider": "dashscope",
+        "tool": "dashscope.images.generate",
         "model": "wan2.7-image",
-        "default_params": {
-            "size": "2K",
-            "watermark": False,
-        },
+        "aliases": ["wan2.7-image"],
+        "default_params": {"size": "2K", "watermark": False},
         "constraints": {
-            "generation_size_param": "size",
             "supported_size_values": ["1K", "2K", "<width>*<height>"],
-            "default_size": "2K",
-            "supports_arbitrary_small_size": False,
-            "max_total_pixels_hint": "2048x2048",
-            "aspect_ratio_range": "[1/16, 16]",
             "size_separator": "*",
+            "max_reference_images": 9,
             "fixed_pixel_export_requires_postprocess": True,
-            "output_format_configurable": False,
-            "max_reference_images": 5,
-            "supported_input_formats": ["jpeg", "png", "webp", "bmp", "tiff", "heic"],
-            "sync_call": True,
         },
-        "notes": [
-            "万相 wan2.7-image runs on Alibaba Bailian (DashScope), a different platform/API key than ARK/Doubao — set DASHSCOPE_API_KEY.",
-            "Uses the synchronous multimodal-generation endpoint; no task polling required.",
-            "DashScope size uses '*' as the separator (e.g. 1024*1024), not 'x'.",
-            "Local reference images are uploaded to public URLs first and sent as image content parts.",
-            "Output image URLs returned by DashScope expire after 24 hours; save them promptly.",
-        ],
-        "source_urls": [
-            "https://help.aliyun.com/zh/model-studio/wan-image-generation-and-editing-api-reference",
-            "https://help.aliyun.com/zh/model-studio/text-to-image",
-        ],
-        "last_verified": "2026-06-22",
+        "last_smoke_tested": "2026-06-29",
     },
-    "wan2.7-image-pro": {
-        "label": "wan2.7-image-pro (万相)",
+    "wan2.7-pro": {
         "provider": "dashscope",
+        "tool": "dashscope.images.generate",
         "model": "wan2.7-image-pro",
-        "default_params": {
-            "size": "2K",
-            "watermark": False,
-        },
+        "aliases": ["wan2.7-image-pro"],
+        "default_params": {"size": "2K", "watermark": False},
         "constraints": {
-            "generation_size_param": "size",
             "supported_size_values": ["1K", "2K", "4K", "<width>*<height>"],
-            "default_size": "2K",
-            "supports_arbitrary_small_size": False,
-            "max_total_pixels_hint": "4096x4096",
-            "aspect_ratio_range": "[1/16, 16]",
             "size_separator": "*",
+            "max_reference_images": 9,
+            "text_to_image_max_size": "4K",
+            "image_reference_max_size": "2K",
             "fixed_pixel_export_requires_postprocess": True,
-            "output_format_configurable": False,
-            "max_reference_images": 5,
-            "supported_input_formats": ["jpeg", "png", "webp", "bmp", "tiff", "heic"],
-            "sync_call": True,
-            "sequential_image_generation": True,
         },
-        "notes": [
-            "万相 wan2.7-image-pro is the most capable Wan image model: text-to-image up to 4096x4096, sequential composition, brand-color and character-consistency controls.",
-            "Runs on Alibaba Bailian (DashScope) — set DASHSCOPE_API_KEY, not ARK_API_KEY.",
-            "Uses the synchronous multimodal-generation endpoint; no task polling required.",
-            "DashScope size uses '*' as the separator (e.g. 2048*2048), not 'x'.",
-        ],
-        "source_urls": [
-            "https://help.aliyun.com/zh/model-studio/wan-image-generation-and-editing-api-reference",
-        ],
-        "last_verified": "2026-06-22",
+        "last_smoke_tested": "2026-06-29",
     },
-    "gemini-banano2": {
-        "label": "gemini-banano2",
+    "gemini-image": {
         "provider": "gemini",
+        "tool": "gemini.images.generate",
         "model": "gemini-3.1-flash-image-preview",
-        "default_params": {
-            "image_size": "2K",
-            "aspect_ratio": "1:1",
-        },
+        "default_params": {"image_size": "2K", "aspect_ratio": "1:1"},
         "constraints": {
-            "generation_size_param": "image_size",
-            "aspect_ratio_param": "aspect_ratio",
             "supported_image_size_values": ["512", "1K", "2K", "4K"],
             "supported_aspect_ratios": [
                 "1:1",
@@ -332,65 +198,76 @@ _IMAGE_GENERATION_PATHS: dict[str, dict[str, Any]] = {
                 "16:9",
                 "21:9",
             ],
-            "default_image_size": "2K",
-            "default_aspect_ratio": "1:1",
-            "supports_arbitrary_pixel_size": False,
             "fixed_pixel_export_requires_postprocess": True,
         },
-        "notes": [
-            "Use image_size plus aspect_ratio for generation control.",
-            "Small final assets such as 200x200 should be produced by deterministic post-processing.",
-        ],
-        "source_urls": [
-            "https://ai.google.dev/gemini-api/docs/image-generation",
-            "https://ai.google.dev/api/generate-content",
-        ],
-        "last_verified": "2026-05-20",
+        "last_smoke_tested": "2026-06-29",
     },
 }
 
-_VIDEO_GENERATION_PATHS: dict[str, dict[str, Any]] = {
-    "doubao-seedance-2-0-260128": {
-        "label": "doubao-seedance-2.0",
+_VIDEO_MODELS: dict[str, dict[str, Any]] = {
+    "seedance-2": {
         "provider": "ark",
+        "tool": "ark.videos.generate",
         "model": "doubao-seedance-2-0-260128",
-        "tool": "videos.generate",
+        "aliases": ["seedance-2.0", "doubao-seedance-2-0-260128"],
         "default_params": {
+            "ratio": "1:1",
+            "duration": 5,
+            "resolution": "720p",
             "watermark": False,
             "generate_audio": False,
         },
         "constraints": {
-            "endpoint": "POST /contents/generations/tasks",
-            "query_endpoint": "GET /contents/generations/tasks/{task_id}",
             "async_task": True,
-            "supported_content_types": ["text", "image_url", "video_url", "audio_url"],
-            "supported_reference_roles": [
-                "reference_image",
-                "reference_video",
-                "reference_audio",
-            ],
-            "ratio_param": "ratio",
             "supported_ratio_values": ["1:1", "4:3", "3:4", "16:9", "9:16"],
-            "default_ratio": "1:1",
-            "duration_param": "duration",
             "recommended_duration_values": [5, 8, 11],
-            "default_duration": 5,
-            "resolution_param": "resolution",
             "recommended_resolution_values": ["720p", "1080p"],
-            "default_resolution": "720p",
-            "watermark_param": "watermark",
-            "generate_audio_param": "generate_audio",
         },
-        "notes": [
-            "Use create_task for non-blocking submission, get_task for polling, or generate with wait_for_completion=True for a blocking call.",
-            "Local image/video/audio references are uploaded first and sent as public URLs.",
-            "Do not mix this with images.generate; Seedance video generation uses the asynchronous contents/generations/tasks endpoint.",
+        "last_smoke_tested": "2026-06-29",
+    },
+}
+
+_TEXT_MODELS: dict[str, dict[str, Any]] = {
+    "doubao-pro": {
+        "provider": "ark",
+        "tool": "ark.text.complete",
+        "model": "doubao-seed-2-0-pro-260215",
+        "json_tool": "ark.text.complete_json",
+        "default_json_thinking": {"type": "disabled"},
+        "last_smoke_tested": "2026-06-29",
+    },
+    "v4-flash": {
+        "provider": "deepseek",
+        "tool": "deepseek.text.complete",
+        "model": "deepseek-v4-flash",
+        "json_tool": "deepseek.text.complete_json",
+        "default_json_thinking": {"type": "disabled"},
+        "last_smoke_tested": "2026-06-29",
+    },
+    "v4-pro": {
+        "provider": "deepseek",
+        "tool": "deepseek.text.complete",
+        "model": "deepseek-v4-pro",
+        "json_tool": "deepseek.text.complete_json",
+        "supports_reasoning_text": True,
+        "thinking_values": [
+            {"type": "disabled"},
+            {"type": "enabled", "reasoning_effort": "high"},
+            {"type": "enabled", "reasoning_effort": "max"},
         ],
-        "source_urls": [
-            "https://www.volcengine.com/docs/82379/1520757?lang=zh",
-            "https://www.volcengine.com/docs/82379/1521309?lang=zh",
-        ],
-        "last_verified": "2026-05-22",
+        "default_json_thinking": {"type": "disabled"},
+        "last_smoke_tested": "2026-06-29",
+    },
+}
+
+_EMBEDDING_MODELS: dict[str, dict[str, Any]] = {
+    "doubao-vision": {
+        "provider": "ark",
+        "tool": "ark.embeddings.generate",
+        "model": "doubao-embedding-vision-251215",
+        "default_dimensions": 2048,
+        "tested_dimensions": [1024, 2048],
+        "last_smoke_tested": "2026-06-29",
     },
 }
 
@@ -409,178 +286,97 @@ def get_tool_spec(tool: str) -> dict[str, Any]:
     return deepcopy(_TOOL_SPECS[tool])
 
 
-def get_default_params(provider: str, tool: str) -> dict[str, Any]:
-    spec = get_tool_spec(tool)
-    provider_spec = spec.get("providers", {}).get(provider)
-    if provider_spec is None:
-        raise KeyError(f"provider {provider!r} does not support {tool!r}")
-    return deepcopy(provider_spec.get("default_params", {}))
+def get_default_params(tool: str) -> dict[str, Any]:
+    return deepcopy(get_tool_spec(tool).get("default_params", {}))
 
 
-def list_image_generation_paths() -> dict[str, dict[str, Any]]:
-    """Return curated image generation paths with model constraints."""
-    return deepcopy(_IMAGE_GENERATION_PATHS)
+def list_image_models() -> dict[str, dict[str, Any]]:
+    return deepcopy(_IMAGE_MODELS)
 
 
-def get_image_generation_path(path: str) -> dict[str, Any]:
-    """Return one curated image generation path by id."""
-    if path not in _IMAGE_GENERATION_PATHS:
-        raise KeyError(f"unknown image generation path: {path}")
-    return deepcopy(_IMAGE_GENERATION_PATHS[path])
+def get_image_model(model: str) -> dict[str, Any]:
+    return _get_model(model, _IMAGE_MODELS, "image")
 
 
-def find_image_path_by_model(model_id: str | None) -> str | None:
-    """Return the curated path id whose ``model`` equals ``model_id``, or None."""
-    if not model_id:
-        return None
-    for path, config in _IMAGE_GENERATION_PATHS.items():
-        if config.get("model") == model_id:
-            return path
-    return None
+def list_video_models() -> dict[str, dict[str, Any]]:
+    return deepcopy(_VIDEO_MODELS)
 
 
-def get_image_capability(
-    *,
-    path: str | None = None,
-    model: str | None = None,
-) -> dict[str, Any] | None:
-    """Return the curated capability for an image model.
-
-    Prefers ``path`` when given. Falls back to a reverse lookup by ``model``.
-    Returns None when neither is resolvable so callers can opt out of the
-    capability-aware path silently.
-    """
-    if path:
-        try:
-            return get_image_generation_path(path)
-        except KeyError:
-            return None
-    if model:
-        resolved = find_image_path_by_model(model)
-        if resolved is not None:
-            return get_image_generation_path(resolved)
-    return None
+def get_video_model(model: str) -> dict[str, Any]:
+    return _get_model(model, _VIDEO_MODELS, "video")
 
 
-def normalize_image_generation_options(
-    path: str,
-    options: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Return validated image generation params for a curated path.
+def list_text_models() -> dict[str, dict[str, Any]]:
+    return deepcopy(_TEXT_MODELS)
 
-    The result is ready to pass into ``images.generate`` as keyword arguments.
-    Unsupported enum-like image size or aspect-ratio values fall back to the
-    documented default for that path.
-    """
-    config = get_image_generation_path(path)
-    constraints = config.get("constraints", {})
+
+def get_text_model(model: str) -> dict[str, Any]:
+    return _get_model(model, _TEXT_MODELS, "text")
+
+
+def list_embedding_models() -> dict[str, dict[str, Any]]:
+    return deepcopy(_EMBEDDING_MODELS)
+
+
+def get_embedding_model(model: str) -> dict[str, Any]:
+    return _get_model(model, _EMBEDDING_MODELS, "embedding")
+
+
+def normalize_image_options(model: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+    config = get_image_model(model)
     params = deepcopy(config.get("default_params", {}))
     params.update(_non_null_options(options))
+    constraints = config.get("constraints", {})
 
-    image_size_values = constraints.get("supported_image_size_values")
-    if image_size_values and params.get("image_size") not in image_size_values:
-        params["image_size"] = constraints.get("default_image_size")
+    if "output_format" in params and "supported_output_formats" in constraints:
+        supported = constraints["supported_output_formats"]
+        value = str(params.get("output_format") or "").lower()
+        if value == "jpg":
+            value = "jpeg"
+        if value not in supported:
+            value = supported[0]
+        params["output_format"] = value
 
-    aspect_ratio_param = constraints.get("aspect_ratio_param")
-    aspect_ratio_values = constraints.get("supported_aspect_ratios")
-    if aspect_ratio_param and aspect_ratio_values:
-        value = params.get(aspect_ratio_param)
-        if value not in aspect_ratio_values:
-            params[aspect_ratio_param] = constraints.get("default_aspect_ratio")
-
-    size_param = constraints.get("generation_size_param")
-    if size_param and not params.get(size_param):
-        default_size = constraints.get("default_size") or constraints.get("default_image_size")
-        if default_size:
-            params[size_param] = default_size
-
-    output_format_param = constraints.get("output_format_param")
-    output_format_values = constraints.get("supported_output_formats")
-    if output_format_param and output_format_values:
-        value = str(params.get(output_format_param) or "").strip().lower()
-        if value not in output_format_values:
-            value = str(constraints.get("default_output_format") or output_format_values[0])
-        params[output_format_param] = value
+    if constraints.get("output_format_configurable") is False:
+        params.pop("output_format", None)
 
     return params
 
 
-def list_video_generation_paths() -> dict[str, dict[str, Any]]:
-    """Return curated video generation paths with model constraints."""
-    return deepcopy(_VIDEO_GENERATION_PATHS)
-
-
-def get_video_generation_path(path: str) -> dict[str, Any]:
-    """Return one curated video generation path by id."""
-    if path not in _VIDEO_GENERATION_PATHS:
-        raise KeyError(f"unknown video generation path: {path}")
-    return deepcopy(_VIDEO_GENERATION_PATHS[path])
-
-
-def normalize_video_generation_options(
-    path: str,
-    options: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Return validated video generation params for a curated path.
-
-    The result is ready to pass into ``videos.generate`` as keyword arguments.
-    """
-    config = get_video_generation_path(path)
-    constraints = config.get("constraints", {})
+def normalize_video_options(model: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+    config = get_video_model(model)
     params = deepcopy(config.get("default_params", {}))
     params.update(_non_null_options(options))
+    constraints = config.get("constraints", {})
 
-    ratio_param = constraints.get("ratio_param", "ratio")
-    supported_ratios = constraints.get("supported_ratio_values", [])
-    if supported_ratios:
-        ratio = str(params.get(ratio_param) or constraints.get("default_ratio") or "").strip()
-        if ratio not in supported_ratios:
-            ratio = str(constraints.get("default_ratio") or supported_ratios[0])
-        params[ratio_param] = ratio
+    ratios = constraints.get("supported_ratio_values") or []
+    if ratios and params.get("ratio") not in ratios:
+        params["ratio"] = config["default_params"]["ratio"]
 
-    duration_param = constraints.get("duration_param", "duration")
-    duration = _coerce_int(
-        params.get(duration_param),
-        int(constraints.get("default_duration") or 5),
-    )
-    params[duration_param] = min(30, max(1, duration))
+    durations = constraints.get("recommended_duration_values") or []
+    if durations:
+        params["duration"] = _coerce_int(params.get("duration"), config["default_params"]["duration"])
 
-    resolution_param = constraints.get("resolution_param", "resolution")
-    supported_resolutions = (
-        constraints.get("supported_resolution_values")
-        or constraints.get("recommended_resolution_values")
-        or []
-    )
-    if supported_resolutions:
-        resolution = str(
-            params.get(resolution_param)
-            or constraints.get("default_resolution")
-            or supported_resolutions[0]
-        ).strip().lower()
-        if resolution not in supported_resolutions:
-            resolution = str(constraints.get("default_resolution") or supported_resolutions[0])
-        params[resolution_param] = resolution
-    elif resolution_param in params or constraints.get("default_resolution"):
-        params[resolution_param] = str(
-            params.get(resolution_param)
-            or constraints.get("default_resolution")
-        ).strip().lower()
+    resolutions = constraints.get("recommended_resolution_values") or []
+    if resolutions and params.get("resolution") not in resolutions:
+        params["resolution"] = config["default_params"]["resolution"]
 
-    watermark_param = constraints.get("watermark_param")
-    if watermark_param:
-        params[watermark_param] = _coerce_bool(
-            params.get(watermark_param),
-            bool(config.get("default_params", {}).get(watermark_param, False)),
-        )
-
-    audio_param = constraints.get("generate_audio_param")
-    if audio_param:
-        params[audio_param] = _coerce_bool(
-            params.get(audio_param),
-            bool(config.get("default_params", {}).get(audio_param, False)),
-        )
-
+    params["watermark"] = _coerce_bool(params.get("watermark"), False)
+    params["generate_audio"] = _coerce_bool(params.get("generate_audio"), False)
     return params
+
+
+def _get_model(model: str, registry: dict[str, dict[str, Any]], kind: str) -> dict[str, Any]:
+    if model in registry:
+        return deepcopy(registry[model])
+    for key, config in registry.items():
+        aliases = set(config.get("aliases", []))
+        aliases.add(config.get("model", ""))
+        if model in aliases:
+            resolved = deepcopy(config)
+            resolved["id"] = key
+            return resolved
+    raise KeyError(f"unknown {kind} model: {model}")
 
 
 def _non_null_options(options: dict[str, Any] | None) -> dict[str, Any]:

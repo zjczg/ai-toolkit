@@ -1,5 +1,6 @@
-"""ARK (豆包/火山引擎) API wrappers."""
+"""ARK (Doubao / Volcengine) platform capabilities."""
 
+from ai_toolkit.ark import embeddings, images, text, videos
 from ai_toolkit.ark.embeddings import ArkEmbeddingError, create_multimodal_embedding
 from ai_toolkit.ark.images import (
     ArkImageError,
@@ -15,6 +16,10 @@ from ai_toolkit.ark.videos import (
 )
 
 __all__ = [
+    "embeddings",
+    "images",
+    "text",
+    "videos",
     "ArkEmbeddingError",
     "ArkImageError",
     "ArkMultimodalError",

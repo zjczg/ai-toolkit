@@ -164,6 +164,7 @@ class ChatCompletionResult:
     provider: str
     model: str
     text: str
+    reasoning_text: str = ""
     parsed_json: Any | None = None
     schema_error: str | None = None
     raw_response: dict[str, Any] | None = None
