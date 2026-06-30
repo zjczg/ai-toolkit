@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ai_toolkit import __version__, capabilities
+from ai_toolkit.aliyun import images as aliyun_images
 from ai_toolkit.ark import embeddings as ark_embeddings
 from ai_toolkit.ark import images as ark_images
 from ai_toolkit.ark import text as ark_text
@@ -13,7 +14,7 @@ from ai_toolkit.gemini import images as gemini_images
 
 
 def test_version_is_updated():
-    assert __version__ == "0.6.0"
+    assert __version__ == "0.7.0"
 
 
 def test_capabilities_use_platform_scoped_tool_names():
@@ -22,6 +23,8 @@ def test_capabilities_use_platform_scoped_tool_names():
     assert "ark.videos.generate" in tools
     assert "ark.text.complete_json" in tools
     assert "deepseek.text.complete" in tools
+    assert "aliyun.images.segment_commodity" in tools
+    assert "aliyun.images.segment_hd_body" in tools
     assert "images.generate" not in tools
     assert "chat.complete" not in tools
 
@@ -253,6 +256,109 @@ def test_ark_embeddings_dimensions_are_forwarded(monkeypatch):
     assert result.first_embedding() == [0.1, 0.2]
     assert captured["model"] == "doubao-embedding-vision-251215"
     assert captured["kwargs"]["dimensions"] == 1024
+
+
+def test_aliyun_segment_commodity_stages_and_saves(monkeypatch, tmp_path):
+    source = tmp_path / "source.png"
+    source.write_bytes(b"\x89PNG\r\n\x1a\n")
+    output = tmp_path / "out.png"
+    captured = {}
+
+    class FakeRequest:
+        def set_ImageURL(self, value):
+            self.image_url = value
+
+    monkeypatch.setattr(
+        aliyun_images,
+        "_import_request_class",
+        lambda module_name, class_name: FakeRequest,
+    )
+    monkeypatch.setattr(
+        aliyun_images,
+        "stage_image",
+        lambda image_path, *, long_side_max: "https://viapi.example/source.png",
+    )
+
+    def fake_invoke(request, *, output_path, api_name, region=None):
+        captured["request_url"] = request.image_url
+        captured["api_name"] = api_name
+        captured["region"] = region
+        Path(output_path).write_bytes(b"png")
+        return {"Data": {"ImageURL": "https://viapi.example/out.png"}}
+
+    monkeypatch.setattr(aliyun_images, "invoke_segmentation_request", fake_invoke)
+
+    result = aliyun_images.segment_commodity(
+        image_path=source,
+        output_path=output,
+        region="cn-shanghai",
+    )
+
+    assert result.provider == "aliyun"
+    assert result.model == "viapi-segment-commodity"
+    assert result.path == output.resolve()
+    assert output.read_bytes() == b"png"
+    assert captured == {
+        "request_url": "https://viapi.example/source.png",
+        "api_name": "SegmentCommodity",
+        "region": "cn-shanghai",
+    }
+    assert result.request["staged_url"] == "https://viapi.example/source.png"
+
+
+def test_aliyun_segment_hd_body_uses_hd_body_contract(monkeypatch, tmp_path):
+    source = tmp_path / "person.png"
+    source.write_bytes(b"\x89PNG\r\n\x1a\n")
+    output = tmp_path / "person-out.png"
+    captured = {}
+
+    class FakeRequest:
+        def set_ImageURL(self, value):
+            self.image_url = value
+
+    monkeypatch.setattr(
+        aliyun_images,
+        "_import_request_class",
+        lambda module_name, class_name: FakeRequest,
+    )
+    monkeypatch.setattr(
+        aliyun_images,
+        "stage_image",
+        lambda image_path, *, long_side_max: "https://viapi.example/person.png",
+    )
+
+    def fake_invoke(request, *, output_path, api_name, region=None):
+        captured["request_url"] = request.image_url
+        captured["api_name"] = api_name
+        Path(output_path).write_bytes(b"png")
+        return {"Data": {"ImageURL": "https://viapi.example/person-out.png"}}
+
+    monkeypatch.setattr(aliyun_images, "invoke_segmentation_request", fake_invoke)
+
+    result = aliyun_images.segment_hd_body(image_path=source, output_path=output)
+
+    assert result.model == "viapi-segment-hd-body"
+    assert result.path == output.resolve()
+    assert captured == {
+        "request_url": "https://viapi.example/person.png",
+        "api_name": "SegmentHDBody",
+    }
+
+
+def test_aliyun_shrink_to_limit_resizes_large_image(tmp_path):
+    source = tmp_path / "large.png"
+    from PIL import Image
+
+    Image.new("RGB", (100, 50), "white").save(source)
+    resized = aliyun_images.shrink_to_limit(source, long_side_max=20)
+
+    try:
+        assert resized != source
+        with Image.open(resized) as image:
+            assert max(image.size) <= 20
+    finally:
+        if resized != source:
+            resized.unlink(missing_ok=True)
 
 
 _TINY_PNG_B64 = (

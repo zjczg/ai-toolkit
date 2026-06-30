@@ -14,6 +14,8 @@ export ARK_API_KEY="..."
 export DASHSCOPE_API_KEY="..."
 export GEMINI_API_KEY="..."
 export DEEPSEEK_API_KEY="..."
+export ALIYUN_ACCESS_KEY_ID="..."
+export ALIYUN_ACCESS_KEY_SECRET="..."
 
 # Used internally when ARK / DashScope need public reference URLs.
 export UPLOAD_SSH_TARGET="root@example.com"
@@ -38,6 +40,8 @@ export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image-preview"
 export GEMINI_IMAGE_SIZE="2K"
 
 export DEEPSEEK_CHAT_MODEL="deepseek-v4-flash"
+
+export ALIYUN_VIAPI_REGION="cn-shanghai"
 ```
 
 ## Platform Entry Points
@@ -45,7 +49,7 @@ export DEEPSEEK_CHAT_MODEL="deepseek-v4-flash"
 Use platform modules directly:
 
 ```python
-from ai_toolkit import ark, dashscope, deepseek, gemini
+from ai_toolkit import aliyun, ark, dashscope, deepseek, gemini
 ```
 
 ### ARK / Doubao
@@ -164,9 +168,42 @@ result = deepseek.text.complete_json(
 `deepseek.text.complete_json` defaults to `thinking={"type": "disabled"}` and
 `response_format={"type": "json_object"}`.
 
-## Supported Model Aliases
+### Aliyun ImageSeg
 
-Smoke-tested on 2026-06-29:
+Install the optional Aliyun SDK dependencies when using this platform:
+
+```bash
+pip install "ai-toolkit[aliyun]"
+```
+
+Product or clothing foreground segmentation:
+
+```python
+result = aliyun.images.segment_commodity(
+    image_path="./source.jpg",
+    output_path="./cutout.png",
+)
+print(result.model, result.path)
+```
+
+Human foreground segmentation:
+
+```python
+result = aliyun.images.segment_hd_body(
+    image_path="./person.jpg",
+    output_path="./person-cutout.png",
+)
+```
+
+Local inputs are staged through Aliyun's viapi temporary OSS helper internally;
+callers do not need to provide a public image URL. The saved output is the
+transparent PNG returned by ImageSeg.
+
+## Supported Model Aliases and API Names
+
+Documented SDK contract. Generation/text/embedding aliases were smoke-tested on 2026-06-29.
+Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic image;
+`SegmentHDBody` is covered by the same SDK flow and unit contract tests.
 
 | Platform | Ability | Aliases | Raw model |
 |---|---|---|---|
@@ -180,6 +217,8 @@ Smoke-tested on 2026-06-29:
 | Gemini | image | `gemini-image` | `gemini-3.1-flash-image-preview` |
 | DeepSeek | text | `v4-flash` | `deepseek-v4-flash` |
 | DeepSeek | text | `v4-pro` | `deepseek-v4-pro` |
+| Aliyun | image segmentation | `viapi-segment-commodity` | `SegmentCommodity` |
+| Aliyun | image segmentation | `viapi-segment-hd-body` | `SegmentHDBody` |
 
 Raw model IDs are still accepted by platform modules, but aliases are the
 documented SDK contract.

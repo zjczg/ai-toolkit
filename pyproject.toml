@@ -12,6 +12,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+aliyun = [
+  "aliyun-python-sdk-core",
+  "aliyun-python-sdk-imageseg",
+  "aliyun-python-sdk-viapiutils",
+  "oss2",
+  "viapi-utils",
+]
 dev = [
   "pytest>=8.0.0",
   "ruff>=0.5.0",

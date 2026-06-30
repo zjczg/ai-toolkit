@@ -32,6 +32,11 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
         "tools": ["deepseek.text.complete", "deepseek.text.complete_json"],
         "env": ["DEEPSEEK_API_KEY"],
     },
+    "aliyun": {
+        "name": "Aliyun ImageSeg",
+        "tools": ["aliyun.images.segment_commodity", "aliyun.images.segment_hd_body"],
+        "env": ["ALIYUN_ACCESS_KEY_ID", "ALIYUN_ACCESS_KEY_SECRET"],
+    },
 }
 
 _TOOL_SPECS: dict[str, dict[str, Any]] = {
@@ -99,6 +104,26 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "default_params": {
             "response_format": {"type": "json_object"},
             "thinking": {"type": "disabled"},
+        },
+    },
+    "aliyun.images.segment_commodity": {
+        "description": "Segment product or clothing foregrounds with Aliyun ImageSeg SegmentCommodity.",
+        "models": ["viapi-segment-commodity"],
+        "reference_mode": "viapi_temp_oss_upload_for_local_files",
+        "default_params": {"region": "cn-shanghai", "long_side_max": 1920},
+        "constraints": {
+            "input": "local image path",
+            "output": "transparent image saved to output_path",
+        },
+    },
+    "aliyun.images.segment_hd_body": {
+        "description": "Segment human foregrounds with Aliyun ImageSeg SegmentHDBody.",
+        "models": ["viapi-segment-hd-body"],
+        "reference_mode": "viapi_temp_oss_upload_for_local_files",
+        "default_params": {"region": "cn-shanghai", "long_side_max": 1920},
+        "constraints": {
+            "input": "local image path",
+            "output": "transparent image saved to output_path",
         },
     },
 }

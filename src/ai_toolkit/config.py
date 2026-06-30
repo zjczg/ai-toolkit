@@ -68,6 +68,13 @@ class Settings:
     deepseek_chat_model: str = field(
         default_factory=lambda: os.getenv("DEEPSEEK_CHAT_MODEL", "deepseek-v4-flash")
     )
+    aliyun_access_key_id: str = field(default_factory=lambda: os.getenv("ALIYUN_ACCESS_KEY_ID", ""))
+    aliyun_access_key_secret: str = field(
+        default_factory=lambda: os.getenv("ALIYUN_ACCESS_KEY_SECRET", "")
+    )
+    aliyun_viapi_region: str = field(
+        default_factory=lambda: os.getenv("ALIYUN_VIAPI_REGION", "cn-shanghai")
+    )
     upload_ssh_target: str = field(default_factory=lambda: os.getenv("UPLOAD_SSH_TARGET", ""))
     upload_identity_file: str = field(default_factory=lambda: os.getenv("UPLOAD_IDENTITY_FILE", ""))
     upload_remote_dir: str = field(default_factory=lambda: os.getenv("UPLOAD_REMOTE_DIR", ""))

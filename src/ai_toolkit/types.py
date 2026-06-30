@@ -76,6 +76,17 @@ class ImageGenerationResult:
 
 
 @dataclass(slots=True)
+class ImageSegmentationResult:
+    """Provider-agnostic saved image segmentation result."""
+
+    provider: str
+    model: str
+    path: Path
+    raw_response: dict[str, Any] | None = None
+    request: dict[str, Any] | None = None
+
+
+@dataclass(slots=True)
 class EmbeddingResult:
     """Provider-agnostic embedding result."""
 
