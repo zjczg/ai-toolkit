@@ -35,6 +35,8 @@ export ARK_EMBEDDING_MODEL="doubao-embedding-vision-251215"
 
 export DASHSCOPE_IMAGE_MODEL="wan2.7-image"
 export DASHSCOPE_IMAGE_SIZE="2K"
+export DASHSCOPE_SPEECH_MODEL="qwen-audio-3.0-tts-plus"
+export DASHSCOPE_SPEECH_VOICE="longanlingxin"
 
 export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image-preview"
 export GEMINI_IMAGE_SIZE="2K"
@@ -125,6 +127,23 @@ result = dashscope.images.generate(
 Local references are uploaded to public URLs internally. `wan2.7` and
 `wan2.7-pro` accept up to 9 reference images.
 
+Speech synthesis:
+
+```python
+result = dashscope.speech.synthesize(
+    model="qwen-audio-tts-plus",
+    text="请介绍一下你负责的项目。",
+    voice="longanlingxin",
+    instruction="使用自然、沉稳、有交流感的普通话，避免播音腔。",
+    language_hints=["zh"],
+    output_path="./question.wav",
+)
+print(result.usage)
+```
+
+The non-streaming API returns a temporary audio URL. When `output_path` is
+provided, `ai-toolkit` downloads it immediately.
+
 ### Gemini
 
 ```python
@@ -214,6 +233,8 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 | ARK | embedding | `doubao-vision` | `doubao-embedding-vision-251215` |
 | DashScope | image | `wan2.7` | `wan2.7-image` |
 | DashScope | image | `wan2.7-pro` | `wan2.7-image-pro` |
+| DashScope | speech | `qwen-audio-tts-plus` | `qwen-audio-3.0-tts-plus` |
+| DashScope | speech | `qwen-audio-tts-flash` | `qwen-audio-3.0-tts-flash` |
 | Gemini | image | `gemini-image` | `gemini-3.1-flash-image-preview` |
 | DeepSeek | text | `v4-flash` | `deepseek-v4-flash` |
 | DeepSeek | text | `v4-pro` | `deepseek-v4-pro` |
@@ -232,4 +253,5 @@ print(capabilities.list_tools())
 print(capabilities.list_image_models())
 print(capabilities.list_text_models())
 print(capabilities.list_embedding_models())
+print(capabilities.list_audio_models())
 ```

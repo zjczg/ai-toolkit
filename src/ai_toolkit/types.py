@@ -76,6 +76,66 @@ class ImageGenerationResult:
 
 
 @dataclass(slots=True)
+class GeneratedAudio:
+    """A provider-agnostic generated audio handle."""
+
+    url: str | None = None
+    b64_data: str | None = None
+    mime_type: str = "audio/wav"
+    local_path: str | None = None
+    audio_id: str = ""
+    expires_at: int | None = None
+
+    def save(self, output_path: str | Path) -> Path:
+        """Save this audio to output_path and return the resolved path."""
+        target = Path(output_path).expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        if self.local_path:
+            source = Path(self.local_path).expanduser().resolve()
+            if source == target:
+                return target
+            shutil.copyfile(source, target)
+            return target
+
+        if self.b64_data:
+            target.write_bytes(base64.b64decode(self.b64_data))
+            self.local_path = str(target)
+            return target
+
+        if self.url:
+            data, mime_type = read_binary(
+                self.url,
+                headers={},
+                error_cls=AIToolkitError,
+                resource_name="Audio",
+            )
+            target.write_bytes(data)
+            self.mime_type = mime_type or self.mime_type
+            self.local_path = str(target)
+            return target
+
+        raise AIToolkitError("generated audio has no url, b64_data, or local_path")
+
+
+@dataclass(slots=True)
+class SpeechSynthesisResult:
+    """Provider-agnostic speech synthesis result."""
+
+    provider: str
+    model: str
+    text: str
+    voice: str
+    audio: GeneratedAudio
+    raw_response: dict[str, Any] | None = None
+    request: dict[str, Any] | None = None
+    usage: dict[str, Any] | None = None
+
+    def save(self, output_path: str | Path) -> Path:
+        return self.audio.save(output_path)
+
+
+@dataclass(slots=True)
 class ImageSegmentationResult:
     """Provider-agnostic saved image segmentation result."""
 

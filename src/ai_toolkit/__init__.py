@@ -1,6 +1,6 @@
 """ai-toolkit — platform-scoped AI model SDK."""
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 from ai_toolkit import aliyun, ark, capabilities, dashscope, deepseek, gemini
 from ai_toolkit.config import Settings, get_settings
@@ -9,10 +9,12 @@ from ai_toolkit.types import (
     AIToolkitError,
     ChatCompletionResult,
     EmbeddingResult,
+    GeneratedAudio,
     GeneratedImage,
     GeneratedVideo,
     ImageGenerationResult,
     ImageSegmentationResult,
+    SpeechSynthesisResult,
     VideoGenerationResult,
     VideoGenerationTask,
 )
@@ -29,10 +31,12 @@ __all__ = [
     "AIToolkitError",
     "ChatCompletionResult",
     "EmbeddingResult",
+    "GeneratedAudio",
     "GeneratedImage",
     "GeneratedVideo",
     "ImageGenerationResult",
     "ImageSegmentationResult",
+    "SpeechSynthesisResult",
     "VideoGenerationResult",
     "VideoGenerationTask",
     # Help

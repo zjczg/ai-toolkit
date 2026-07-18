@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Added `dashscope.speech.synthesize` for Qwen-Audio-TTS non-streaming speech synthesis.
+- Added provider-agnostic `GeneratedAudio` and `SpeechSynthesisResult` types.
+- Registered Qwen-Audio-TTS Plus and Flash model aliases and audio capabilities.
+- Added `DASHSCOPE_SPEECH_MODEL` and `DASHSCOPE_SPEECH_VOICE` optional defaults.
+
 ## 0.5.0
 
 - Added 万相 / 通义 (阿里百炼 DashScope) as an image generation provider, separate from ARK/Doubao. Set `DASHSCOPE_API_KEY` (plus optional `DASHSCOPE_BASE_URL`, `DASHSCOPE_IMAGE_MODEL`, `DASHSCOPE_IMAGE_SIZE`).

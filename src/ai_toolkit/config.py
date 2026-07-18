@@ -52,6 +52,15 @@ class Settings:
         default_factory=lambda: os.getenv("DASHSCOPE_IMAGE_MODEL", "wan2.7-image")
     )
     dashscope_image_size: str = field(default_factory=lambda: os.getenv("DASHSCOPE_IMAGE_SIZE", "2K"))
+    dashscope_speech_model: str = field(
+        default_factory=lambda: os.getenv(
+            "DASHSCOPE_SPEECH_MODEL",
+            "qwen-audio-3.0-tts-plus",
+        )
+    )
+    dashscope_speech_voice: str = field(
+        default_factory=lambda: os.getenv("DASHSCOPE_SPEECH_VOICE", "longanlingxin")
+    )
     ark_response_model: str = field(
         default_factory=lambda: os.getenv("ARK_RESPONSE_MODEL", "doubao-seed-2-0-pro-260215")
     )

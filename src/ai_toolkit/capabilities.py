@@ -18,8 +18,8 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
         "env": ["ARK_API_KEY"],
     },
     "dashscope": {
-        "name": "DashScope / Wan",
-        "tools": ["dashscope.images.generate"],
+        "name": "DashScope / Wan / Qwen",
+        "tools": ["dashscope.images.generate", "dashscope.speech.synthesize"],
         "env": ["DASHSCOPE_API_KEY"],
     },
     "gemini": {
@@ -86,6 +86,15 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "models": ["wan2.7", "wan2.7-pro"],
         "reference_mode": "public_url_upload_for_local_files",
         "default_params": {"size": "2K", "watermark": False},
+    },
+    "dashscope.speech.synthesize": {
+        "description": "Synthesize speech with DashScope Qwen-Audio-TTS models.",
+        "models": ["qwen-audio-tts-plus", "qwen-audio-tts-flash"],
+        "default_params": {
+            "format": "wav",
+            "sample_rate": 24000,
+            "voice": "longanlingxin",
+        },
     },
     "gemini.images.generate": {
         "description": "Generate images with Gemini image models.",
@@ -296,6 +305,49 @@ _EMBEDDING_MODELS: dict[str, dict[str, Any]] = {
     },
 }
 
+_AUDIO_MODELS: dict[str, dict[str, Any]] = {
+    "qwen-audio-tts-plus": {
+        "provider": "dashscope",
+        "tool": "dashscope.speech.synthesize",
+        "model": "qwen-audio-3.0-tts-plus",
+        "aliases": ["qwen-audio-3.0-tts-plus"],
+        "default_params": {
+            "format": "wav",
+            "sample_rate": 24000,
+            "voice": "longanlingxin",
+        },
+        "constraints": {
+            "supported_formats": ["mp3", "opus", "pcm", "wav"],
+            "supported_sample_rates": [8000, 16000, 22050, 24000, 44100, 48000],
+            "system_voices": ["longanlingxin", "longanlufeng"],
+            "instruction_supported": True,
+        },
+        "last_smoke_tested": "2026-07-18",
+    },
+    "qwen-audio-tts-flash": {
+        "provider": "dashscope",
+        "tool": "dashscope.speech.synthesize",
+        "model": "qwen-audio-3.0-tts-flash",
+        "aliases": ["qwen-audio-3.0-tts-flash"],
+        "default_params": {
+            "format": "wav",
+            "sample_rate": 24000,
+            "voice": "longanhuan_v3.6",
+        },
+        "constraints": {
+            "supported_formats": ["mp3", "opus", "pcm", "wav"],
+            "supported_sample_rates": [8000, 16000, 22050, 24000, 44100, 48000],
+            "system_voices": [
+                "longanhuan_v3.6",
+                "longjielidou_v3.6",
+                "loongeva_v3.6",
+                "loongjohn",
+            ],
+            "instruction_supported": True,
+        },
+    },
+}
+
 
 def list_providers() -> dict[str, dict[str, Any]]:
     return deepcopy(_PROVIDERS)
@@ -345,6 +397,14 @@ def list_embedding_models() -> dict[str, dict[str, Any]]:
 
 def get_embedding_model(model: str) -> dict[str, Any]:
     return _get_model(model, _EMBEDDING_MODELS, "embedding")
+
+
+def list_audio_models() -> dict[str, dict[str, Any]]:
+    return deepcopy(_AUDIO_MODELS)
+
+
+def get_audio_model(model: str) -> dict[str, Any]:
+    return _get_model(model, _AUDIO_MODELS, "audio")
 
 
 def normalize_image_options(model: str, options: dict[str, Any] | None = None) -> dict[str, Any]:

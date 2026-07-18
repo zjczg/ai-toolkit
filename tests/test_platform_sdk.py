@@ -2,19 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ai_toolkit import __version__, capabilities
+from ai_toolkit import GeneratedAudio, __version__, capabilities
 from ai_toolkit.aliyun import images as aliyun_images
 from ai_toolkit.ark import embeddings as ark_embeddings
 from ai_toolkit.ark import images as ark_images
 from ai_toolkit.ark import text as ark_text
 from ai_toolkit.ark import videos as ark_videos
 from ai_toolkit.dashscope import images as dashscope_images
+from ai_toolkit.dashscope import speech as dashscope_speech
 from ai_toolkit.deepseek import text as deepseek_text
 from ai_toolkit.gemini import images as gemini_images
 
 
 def test_version_is_updated():
-    assert __version__ == "0.7.0"
+    assert __version__ == "0.8.0"
 
 
 def test_capabilities_use_platform_scoped_tool_names():
@@ -23,6 +24,7 @@ def test_capabilities_use_platform_scoped_tool_names():
     assert "ark.videos.generate" in tools
     assert "ark.text.complete_json" in tools
     assert "deepseek.text.complete" in tools
+    assert "dashscope.speech.synthesize" in tools
     assert "aliyun.images.segment_commodity" in tools
     assert "aliyun.images.segment_hd_body" in tools
     assert "images.generate" not in tools
@@ -36,6 +38,10 @@ def test_model_aliases_resolve_to_raw_provider_ids():
     assert ark_text.resolve_model("doubao-pro") == "doubao-seed-2-0-pro-260215"
     assert deepseek_text.resolve_model("v4-pro") == "deepseek-v4-pro"
     assert dashscope_images.resolve_model("wan2.7-pro") == "wan2.7-image-pro"
+    assert (
+        dashscope_speech.resolve_model("qwen-audio-tts-plus")
+        == "qwen-audio-3.0-tts-plus"
+    )
     assert gemini_images.resolve_model("gemini-image") == "gemini-3.1-flash-image-preview"
     assert ark_embeddings.resolve_model("doubao-vision") == "doubao-embedding-vision-251215"
 
@@ -178,6 +184,66 @@ def test_dashscope_image_generation_supports_nine_references(monkeypatch):
     assert result.images[0].url == "https://dashscope.example/out.png"
     assert len(captured["image_urls"]) == 9
     assert captured["parameters"]["size"] == "2K"
+
+
+def test_dashscope_speech_synthesis_returns_downloadable_audio(monkeypatch):
+    captured = {}
+
+    def fake_create_speech_synthesis(model, *, text, voice, **input_options):
+        captured["model"] = model
+        captured["text"] = text
+        captured["voice"] = voice
+        captured["input_options"] = input_options
+        return {
+            "output": {
+                "finish_reason": "stop",
+                "audio": {
+                    "url": "https://dashscope.example/out.wav",
+                    "id": "audio-1",
+                    "expires_at": 1784462605,
+                },
+            },
+            "usage": {"characters": 12},
+        }
+
+    monkeypatch.setattr(
+        dashscope_speech,
+        "create_speech_synthesis",
+        fake_create_speech_synthesis,
+    )
+
+    result = dashscope_speech.synthesize(
+        model="qwen-audio-tts-plus",
+        text="自然地介绍这个项目。",
+        voice="longanlingxin",
+        instruction="使用自然、沉稳的普通话。",
+        language_hints=["zh"],
+    )
+
+    assert result.model == "qwen-audio-3.0-tts-plus"
+    assert result.audio.url == "https://dashscope.example/out.wav"
+    assert result.audio.audio_id == "audio-1"
+    assert result.audio.mime_type == "audio/wav"
+    assert result.usage == {"characters": 12}
+    assert captured == {
+        "model": "qwen-audio-3.0-tts-plus",
+        "text": "自然地介绍这个项目。",
+        "voice": "longanlingxin",
+        "input_options": {
+            "format": "wav",
+            "sample_rate": 24000,
+            "instruction": "使用自然、沉稳的普通话。",
+            "language_hints": ["zh"],
+        },
+    }
+
+
+def test_generated_audio_saves_base64_data(tmp_path):
+    output = tmp_path / "sample.wav"
+    audio = GeneratedAudio(b64_data="UklGRg==")
+
+    assert audio.save(output) == output.resolve()
+    assert output.read_bytes() == b"RIFF"
 
 
 def test_gemini_generate_embeds_local_reference(monkeypatch, tmp_path):
