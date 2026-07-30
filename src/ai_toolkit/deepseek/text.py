@@ -7,6 +7,11 @@ from typing import Any
 from ai_toolkit._structured import parse_json, validate_against_schema
 from ai_toolkit.config import get_settings
 from ai_toolkit.deepseek.chat import create_chat_completion
+from ai_toolkit.structured import (
+    JsonOutputModel,
+    output_schema,
+    validate_output_model,
+)
 from ai_toolkit.types import ChatCompletionResult
 
 MODEL_ALIASES = {
@@ -52,9 +57,20 @@ def complete_json(
     prompt: str | None = None,
     model: str | None = None,
     schema: dict[str, Any] | None = None,
+    output_type: type[JsonOutputModel] | None = None,
     disable_thinking: bool = True,
     **kwargs: Any,
 ) -> ChatCompletionResult:
+    """Generate JSON with optional strict local Pydantic validation.
+
+    DeepSeek receives JSON-object mode rather than the output schema, so
+    callers should include ``output_type.prompt_fragment()`` in their prompt.
+    The legacy ``schema`` path remains non-raising.
+    """
+    output_schema(
+        schema=schema,
+        output_type=output_type,
+    )
     request_kwargs = _drop_none_values(kwargs)
     request_kwargs.setdefault("response_format", {"type": "json_object"})
     if disable_thinking and request_kwargs.get("thinking") is None:
@@ -66,6 +82,9 @@ def complete_json(
         model=model,
         **request_kwargs,
     )
+    if output_type is not None:
+        return validate_output_model(result, output_type)
+
     parsed = parse_json(result.text)
     if schema is not None and parsed is not None:
         error = validate_against_schema(parsed, schema)

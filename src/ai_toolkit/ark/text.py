@@ -10,6 +10,11 @@ from ai_toolkit._structured import parse_json, validate_against_schema
 from ai_toolkit.ark.responses import create_responses
 from ai_toolkit.config import get_settings
 from ai_toolkit.media import upload_public_url
+from ai_toolkit.structured import (
+    JsonOutputModel,
+    output_schema,
+    validate_output_model,
+)
 from ai_toolkit.types import ChatCompletionResult
 
 MODEL_ALIASES = {
@@ -56,6 +61,7 @@ def complete_json(
     images: list[str | Path] | tuple[str | Path, ...] = (),
     model: str | None = None,
     schema: dict[str, Any] | None = None,
+    output_type: type[JsonOutputModel] | None = None,
     schema_name: str = "structured_response",
     strict: bool = True,
     disable_thinking: bool = True,
@@ -65,11 +71,21 @@ def complete_json(
 
     JSON extraction defaults to ``thinking={"type": "disabled"}``; enabling
     thinking on ARK may mix reasoning text into ``result.text``.
+    ``output_type`` enables native JSON Schema output plus strict local
+    Pydantic validation. The legacy ``schema`` path remains non-raising.
     """
+    resolved_schema = output_schema(
+        schema=schema,
+        output_type=output_type,
+    )
     request_kwargs = _drop_none_values(kwargs)
     request_kwargs.setdefault(
         "text",
-        _text_format(schema=schema, schema_name=schema_name, strict=strict),
+        _text_format(
+            schema=resolved_schema,
+            schema_name=schema_name,
+            strict=strict,
+        ),
     )
     if disable_thinking and request_kwargs.get("thinking") is None:
         request_kwargs["thinking"] = {"type": "disabled"}
@@ -81,6 +97,9 @@ def complete_json(
         model=model,
         **request_kwargs,
     )
+    if output_type is not None:
+        return validate_output_model(result, output_type)
+
     parsed = parse_json(result.text)
     if schema is not None and parsed is not None:
         error = validate_against_schema(parsed, schema)

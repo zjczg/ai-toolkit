@@ -241,3 +241,4 @@ class ChatCompletionResult:
     raw_response: dict[str, Any] | None = None
     request: dict[str, Any] | None = None
     usage: dict[str, Any] | None = None
+    output: Any | None = None

@@ -12,6 +12,8 @@ endpoint and are intentionally out of scope here.
 
 from __future__ import annotations
 
+import base64
+import mimetypes
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -156,14 +158,25 @@ def _extract_images(response: dict[str, Any]) -> list[GeneratedImage]:
 
 def _reference_to_url(reference: str | Path) -> str:
     value = str(reference)
-    if _is_http_url(value):
+    if _is_remote_reference(value) or value.startswith("data:"):
         return value
+    local_path = Path(value).expanduser()
+    if local_path.is_file():
+        return _local_image_data_url(local_path)
     return upload_public_url(value)
 
 
-def _is_http_url(value: str) -> bool:
+def _is_remote_reference(value: str) -> bool:
     parsed = urlparse(value)
-    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    return parsed.scheme in {"http", "https", "oss"} and bool(parsed.netloc)
+
+
+def _local_image_data_url(path: Path) -> str:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if mime_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise ValueError(f"unsupported DashScope reference image format: {path}")
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def _response_usage(response: dict[str, Any]) -> dict[str, Any] | None:

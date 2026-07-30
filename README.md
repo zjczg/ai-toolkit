@@ -2,8 +2,18 @@
 
 Platform-scoped Python SDK for reusable AI model calls.
 
-The package does not store API keys. Runtime configuration is read from
-environment variables only.
+The package does not store API keys. Runtime configuration is resolved, in
+order, from process environment variables, `.env` in the current working
+directory, `${XDG_CONFIG_HOME:-~/.config}/ai-toolkit/env`, and built-in
+defaults. Set `AI_TOOLKIT_ENV_FILE` to select a different user file.
+
+Resolution is based on key presence, so an explicitly empty value blocks
+lower-priority fallbacks. Dotenv files are read without modifying
+`os.environ`; restart the process after editing one because file contents are
+cached. Keep the user file private (for example, `chmod 600`) and run commands
+directly when you want project `.env` values to override user defaults. An
+`ai-run` wrapper that exports the user file instead promotes those values to
+the highest-priority process environment.
 
 ## Environment
 
@@ -35,6 +45,10 @@ export ARK_EMBEDDING_MODEL="doubao-embedding-vision-251215"
 
 export DASHSCOPE_IMAGE_MODEL="wan2.7-image"
 export DASHSCOPE_IMAGE_SIZE="2K"
+export DASHSCOPE_VIDEO_MODEL="happyhorse-1.1-r2v"
+export DASHSCOPE_VIDEO_RATIO="1:1"
+export DASHSCOPE_VIDEO_DURATION="5"
+export DASHSCOPE_VIDEO_RESOLUTION="720P"
 export DASHSCOPE_SPEECH_MODEL="qwen-audio-3.0-tts-plus"
 export DASHSCOPE_SPEECH_VOICE="longanlingxin"
 
@@ -124,8 +138,28 @@ result = dashscope.images.generate(
 )
 ```
 
-Local references are uploaded to public URLs internally. `wan2.7` and
-`wan2.7-pro` accept up to 9 reference images.
+Local image references are sent as DashScope-supported inline base64 data;
+`wan2.7` and `wan2.7-pro` accept up to 9 reference images.
+
+HappyHorse video generation:
+
+```python
+result = dashscope.videos.generate(
+    model="happyhorse-1.1-r2v",
+    prompt="The orange kitten in [Image 1] takes two gentle steps forward.",
+    references=["./kitten.png"],
+    output_path="./kitten-walk.mp4",
+    ratio="1:1",
+    duration=5,
+    resolution="720P",
+    watermark=False,
+)
+```
+
+`happyhorse-1.1-t2v` accepts only text, `happyhorse-1.1-i2v` accepts exactly
+one first-frame image, and `happyhorse-1.1-r2v` accepts 1–9 reference images.
+Tasks are asynchronous and are polled every 15 seconds by default. Local image
+references are sent as inline base64 data, so no public upload is required.
 
 Speech synthesis:
 
@@ -191,6 +225,50 @@ result = deepseek.text.complete_json(
 `deepseek.text.complete_json` defaults to `thinking={"type": "disabled"}` and
 `response_format={"type": "json_object"}`.
 
+### Typed JSON outputs
+
+Define a reusable output model once, then use it in both the prompt and the
+model call:
+
+```python
+from pydantic import Field
+
+from ai_toolkit import JsonOutputModel, deepseek
+
+
+class PetSceneOutput(JsonOutputModel):
+    asset_prompt: str = Field(
+        min_length=1,
+        description="完整的图片或视频生成提示词",
+    )
+    event_summary: str = Field(
+        min_length=1,
+        description="会影响下一轮互动的简洁事件摘要",
+    )
+
+
+result = deepseek.text.complete_json(
+    model="v4-flash",
+    prompt=(
+        "描述宠物的自然反应。\n\n"
+        f"{PetSceneOutput.prompt_fragment()}"
+    ),
+    output_type=PetSceneOutput,
+)
+scene = result.output
+print(scene.asset_prompt, scene.event_summary)
+```
+
+`prompt_fragment()` renders a compact JSON example for explicit prompt
+composition. ARK sends `output_type.model_json_schema()` through its native
+JSON Schema format; DeepSeek continues to use JSON-object mode. Both providers
+validate the parsed response with Pydantic and raise `StructuredOutputError`
+when decoding or validation fails.
+
+The existing `schema=` form remains available for dictionary results and keeps
+its non-raising `parsed_json` / `schema_error` behavior. Do not pass `schema`
+and `output_type` together.
+
 ### Aliyun ImageSeg
 
 Install the optional Aliyun SDK dependencies when using this platform:
@@ -198,6 +276,20 @@ Install the optional Aliyun SDK dependencies when using this platform:
 ```bash
 pip install "ai-toolkit[aliyun]"
 ```
+
+General foreground extraction with Aidge ImageMatting:
+
+```python
+result = aliyun.images.image_matting(
+    image_path="./pet.png",
+    output_path="./pet-cutout.png",
+)
+print(result.model, result.path)
+```
+
+`image_matting` preserves the canvas size and downloads a transparent PNG. It
+accepts local images from 256×256 through 3000×3000 and stages them to a
+temporary OSS URL internally.
 
 Product or clothing foreground segmentation:
 
@@ -218,6 +310,22 @@ result = aliyun.images.segment_hd_body(
 )
 ```
 
+General high-definition foreground segmentation:
+
+```python
+result = aliyun.images.segment_hd_common_image(
+    image_path="./pet.jpg",
+    output_path="./pet-cutout.png",
+)
+```
+
+`segment_hd_common_image` accepts images smaller than 10000×10000 and no
+larger than 40 MB. The SDK wrapper submits the asynchronous task, polls it,
+and downloads the transparent PNG before returning. Temporary network errors
+during OSS staging, API calls, polling, or result download are retried up to
+three times with 2, 4, and 8 second delays. Authentication, permission,
+parameter, response-format, and terminal job errors fail immediately.
+
 Local inputs are staged through Aliyun's viapi temporary OSS helper internally;
 callers do not need to provide a public image URL. The saved output is the
 transparent PNG returned by ImageSeg.
@@ -237,6 +345,9 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 | ARK | embedding | `doubao-vision` | `doubao-embedding-vision-251215` |
 | DashScope | image | `wan2.7` | `wan2.7-image` |
 | DashScope | image | `wan2.7-pro` | `wan2.7-image-pro` |
+| DashScope | video | `happyhorse-1.1-t2v` | `happyhorse-1.1-t2v` |
+| DashScope | video | `happyhorse-1.1-i2v` | `happyhorse-1.1-i2v` |
+| DashScope | video | `happyhorse-1.1-r2v` | `happyhorse-1.1-r2v` |
 | DashScope | speech | `qwen-audio-tts-plus` | `qwen-audio-3.0-tts-plus` |
 | DashScope | speech | `qwen-audio-tts-flash` | `qwen-audio-3.0-tts-flash` |
 | Gemini | image | `gemini-image`, `nano-banana-2` | `gemini-3.1-flash-image` |
@@ -244,8 +355,10 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 | Gemini | image | `gemini-image-pro`, `nano-banana-pro` | `gemini-3-pro-image` |
 | DeepSeek | text | `v4-flash` | `deepseek-v4-flash` |
 | DeepSeek | text | `v4-pro` | `deepseek-v4-pro` |
+| Aliyun | image matting | `aidge-image-matting` | `ImageMatting` |
 | Aliyun | image segmentation | `viapi-segment-commodity` | `SegmentCommodity` |
 | Aliyun | image segmentation | `viapi-segment-hd-body` | `SegmentHDBody` |
+| Aliyun | image segmentation | `viapi-segment-hd-common-image` | `SegmentHDCommonImage` |
 
 Raw model IDs are still accepted by platform modules, but aliases are the
 documented SDK contract.

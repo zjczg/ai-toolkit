@@ -14,7 +14,7 @@ def list_interfaces() -> list[str]:
 def help(name: str | None = None) -> dict[str, Any]:
     if name is None:
         return {
-            "version": "0.8.0",
+            "version": "0.9.0",
             "tools": capabilities.list_tools(),
             "providers": capabilities.list_providers(),
         }

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from ai_toolkit import GeneratedAudio, __version__, capabilities
+from ai_toolkit import GeneratedAudio, __version__, capabilities, help
 from ai_toolkit.aliyun import images as aliyun_images
 from ai_toolkit.ark import embeddings as ark_embeddings
 from ai_toolkit.ark import images as ark_images
@@ -12,12 +12,14 @@ from ai_toolkit.ark import text as ark_text
 from ai_toolkit.ark import videos as ark_videos
 from ai_toolkit.dashscope import images as dashscope_images
 from ai_toolkit.dashscope import speech as dashscope_speech
+from ai_toolkit.dashscope import videos as dashscope_videos
 from ai_toolkit.deepseek import text as deepseek_text
 from ai_toolkit.gemini import images as gemini_images
 
 
 def test_version_is_updated():
-    assert __version__ == "0.8.0"
+    assert __version__ == "0.9.0"
+    assert help()["version"] == __version__
 
 
 def test_capabilities_use_platform_scoped_tool_names():
@@ -40,6 +42,7 @@ def test_model_aliases_resolve_to_raw_provider_ids():
     assert ark_text.resolve_model("doubao-pro") == "doubao-seed-2-0-pro-260215"
     assert deepseek_text.resolve_model("v4-pro") == "deepseek-v4-pro"
     assert dashscope_images.resolve_model("wan2.7-pro") == "wan2.7-image-pro"
+    assert dashscope_videos.resolve_model("happyhorse-r2v") == "happyhorse-1.1-r2v"
     assert (
         dashscope_speech.resolve_model("qwen-audio-tts-plus")
         == "qwen-audio-3.0-tts-plus"
@@ -189,6 +192,82 @@ def test_dashscope_image_generation_supports_nine_references(monkeypatch):
     assert result.images[0].url == "https://dashscope.example/out.png"
     assert len(captured["image_urls"]) == 9
     assert captured["parameters"]["size"] == "2K"
+
+
+def test_dashscope_image_generation_encodes_local_reference(monkeypatch, tmp_path):
+    reference = tmp_path / "cat.png"
+    reference.write_bytes(b"png-data")
+    captured = {}
+
+    def fake_create_image_generation(model, prompt, *, image_urls=None, **parameters):
+        captured["image_urls"] = image_urls
+        return {
+            "output": {
+                "choices": [
+                    {"message": {"content": [{"image": "https://dashscope.example/out.png"}]}}
+                ]
+            }
+        }
+
+    monkeypatch.setattr(dashscope_images, "create_image_generation", fake_create_image_generation)
+    result = dashscope_images.generate(
+        model="wan2.7-pro",
+        prompt="compose",
+        references=[reference],
+    )
+
+    assert result.images[0].url == "https://dashscope.example/out.png"
+    assert captured["image_urls"] == ["data:image/png;base64,cG5nLWRhdGE="]
+
+
+def test_dashscope_happyhorse_r2v_uses_reference_images_and_polls(monkeypatch, tmp_path):
+    reference = tmp_path / "cat.png"
+    reference.write_bytes(b"png-data")
+    captured = {}
+
+    def fake_create_video_generation_task(model, *, prompt, media, parameters):
+        captured.update(model=model, prompt=prompt, media=media, parameters=parameters)
+        return {"output": {"task_id": "task-1", "task_status": "PENDING"}}
+
+    def fake_get_video_generation_task(task_id):
+        assert task_id == "task-1"
+        return {
+            "output": {
+                "task_id": task_id,
+                "task_status": "SUCCEEDED",
+                "video_url": "https://dashscope.example/out.mp4",
+            }
+        }
+
+    monkeypatch.setattr(
+        dashscope_videos,
+        "create_video_generation_task",
+        fake_create_video_generation_task,
+    )
+    monkeypatch.setattr(
+        dashscope_videos,
+        "get_video_generation_task",
+        fake_get_video_generation_task,
+    )
+
+    result = dashscope_videos.generate(
+        model="happyhorse-r2v",
+        prompt="The kitten in [Image 1] walks.",
+        references=[reference],
+        poll_interval=0.1,
+    )
+
+    assert result.model == "happyhorse-1.1-r2v"
+    assert result.first_video().url == "https://dashscope.example/out.mp4"
+    assert captured["media"] == [
+        {"type": "reference_image", "url": "data:image/png;base64,cG5nLWRhdGE="}
+    ]
+    assert captured["parameters"] == {
+        "resolution": "720P",
+        "duration": 5,
+        "watermark": False,
+        "ratio": "1:1",
+    }
 
 
 def test_dashscope_speech_synthesis_returns_downloadable_audio(monkeypatch):

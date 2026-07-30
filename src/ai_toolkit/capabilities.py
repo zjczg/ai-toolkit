@@ -19,7 +19,11 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "dashscope": {
         "name": "DashScope / Wan / Qwen",
-        "tools": ["dashscope.images.generate", "dashscope.speech.synthesize"],
+        "tools": [
+            "dashscope.images.generate",
+            "dashscope.videos.generate",
+            "dashscope.speech.synthesize",
+        ],
         "env": ["DASHSCOPE_API_KEY"],
     },
     "gemini": {
@@ -33,8 +37,13 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
         "env": ["DEEPSEEK_API_KEY"],
     },
     "aliyun": {
-        "name": "Aliyun ImageSeg",
-        "tools": ["aliyun.images.segment_commodity", "aliyun.images.segment_hd_body"],
+        "name": "Aliyun vision APIs",
+        "tools": [
+            "aliyun.images.image_matting",
+            "aliyun.images.segment_commodity",
+            "aliyun.images.segment_hd_body",
+            "aliyun.images.segment_hd_common_image",
+        ],
         "env": ["ALIYUN_ACCESS_KEY_ID", "ALIYUN_ACCESS_KEY_SECRET"],
     },
 }
@@ -87,6 +96,17 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "reference_mode": "public_url_upload_for_local_files",
         "default_params": {"size": "2K", "watermark": False},
     },
+    "dashscope.videos.generate": {
+        "description": "Submit and optionally wait for DashScope HappyHorse video generation.",
+        "models": ["happyhorse-1.1-t2v", "happyhorse-1.1-i2v", "happyhorse-1.1-r2v"],
+        "reference_mode": "inline_base64_or_public_url_for_local_images",
+        "default_params": {
+            "ratio": "1:1",
+            "duration": 5,
+            "resolution": "720P",
+            "watermark": False,
+        },
+    },
     "dashscope.speech.synthesize": {
         "description": "Synthesize speech with DashScope Qwen-Audio-TTS models.",
         "models": ["qwen-audio-tts-plus", "qwen-audio-tts-flash"],
@@ -115,6 +135,22 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
             "thinking": {"type": "disabled"},
         },
     },
+    "aliyun.images.image_matting": {
+        "description": (
+            "Extract the salient subject as a transparent PNG with Aliyun Aidge ImageMatting."
+        ),
+        "models": ["aidge-image-matting"],
+        "reference_mode": "temporary_oss_upload_for_local_files",
+        "default_params": {
+            "endpoint": "aidge.cn-beijing.aliyuncs.com",
+            "background_type": "TRANSPARENT",
+            "long_side_max": 3000,
+        },
+        "constraints": {
+            "input": "local image path; 256-3000 px per side; at most 10 MB",
+            "output": "transparent image saved to output_path",
+        },
+    },
     "aliyun.images.segment_commodity": {
         "description": "Segment product or clothing foregrounds with Aliyun ImageSeg SegmentCommodity.",
         "models": ["viapi-segment-commodity"],
@@ -133,6 +169,20 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "constraints": {
             "input": "local image path",
             "output": "transparent image saved to output_path",
+        },
+    },
+    "aliyun.images.segment_hd_common_image": {
+        "description": ("Segment general foregrounds with Aliyun ImageSeg SegmentHDCommonImage."),
+        "models": ["viapi-segment-hd-common-image"],
+        "reference_mode": "viapi_temp_oss_upload_for_local_files",
+        "default_params": {
+            "region": "cn-shanghai",
+            "poll_interval_seconds": 1.0,
+            "timeout_seconds": 120.0,
+        },
+        "constraints": {
+            "input": "local image path; each side >32 and <10000 px; at most 40 MB",
+            "output": "transparent PNG saved to output_path",
         },
     },
 }
@@ -285,6 +335,56 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
 }
 
 _VIDEO_MODELS: dict[str, dict[str, Any]] = {
+    "happyhorse-1.1-r2v": {
+        "provider": "dashscope",
+        "tool": "dashscope.videos.generate",
+        "model": "happyhorse-1.1-r2v",
+        "aliases": ["happyhorse-r2v"],
+        "default_params": {
+            "ratio": "1:1",
+            "duration": 5,
+            "resolution": "720P",
+            "watermark": False,
+        },
+        "constraints": {
+            "async_task": True,
+            "reference_images": "1-9",
+            "supported_ratio_values": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "recommended_duration_values": [3, 5, 8, 10, 15],
+            "recommended_resolution_values": ["720P", "1080P"],
+        },
+    },
+    "happyhorse-1.1-i2v": {
+        "provider": "dashscope",
+        "tool": "dashscope.videos.generate",
+        "model": "happyhorse-1.1-i2v",
+        "aliases": ["happyhorse-i2v"],
+        "default_params": {"duration": 5, "resolution": "720P", "watermark": False},
+        "constraints": {
+            "async_task": True,
+            "reference_images": "exactly 1 first frame",
+            "recommended_duration_values": [3, 5, 8, 10, 15],
+            "recommended_resolution_values": ["720P", "1080P"],
+        },
+    },
+    "happyhorse-1.1-t2v": {
+        "provider": "dashscope",
+        "tool": "dashscope.videos.generate",
+        "model": "happyhorse-1.1-t2v",
+        "aliases": ["happyhorse-t2v"],
+        "default_params": {
+            "ratio": "1:1",
+            "duration": 5,
+            "resolution": "720P",
+            "watermark": False,
+        },
+        "constraints": {
+            "async_task": True,
+            "supported_ratio_values": ["1:1", "4:3", "3:4", "16:9", "9:16"],
+            "recommended_duration_values": [3, 5, 8, 10, 15],
+            "recommended_resolution_values": ["720P", "1080P"],
+        },
+    },
     "seedance-2": {
         "provider": "ark",
         "tool": "ark.videos.generate",
@@ -486,7 +586,9 @@ def normalize_video_options(model: str, options: dict[str, Any] | None = None) -
 
     durations = constraints.get("recommended_duration_values") or []
     if durations:
-        params["duration"] = _coerce_int(params.get("duration"), config["default_params"]["duration"])
+        params["duration"] = _coerce_int(
+            params.get("duration"), config["default_params"]["duration"]
+        )
 
     resolutions = constraints.get("recommended_resolution_values") or []
     if resolutions and params.get("resolution") not in resolutions:
