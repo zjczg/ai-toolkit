@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from ai_toolkit import GeneratedAudio, __version__, capabilities
 from ai_toolkit.aliyun import images as aliyun_images
 from ai_toolkit.ark import embeddings as ark_embeddings
@@ -42,7 +44,10 @@ def test_model_aliases_resolve_to_raw_provider_ids():
         dashscope_speech.resolve_model("qwen-audio-tts-plus")
         == "qwen-audio-3.0-tts-plus"
     )
-    assert gemini_images.resolve_model("gemini-image") == "gemini-3.1-flash-image-preview"
+    assert gemini_images.resolve_model("gemini-image") == "gemini-3.1-flash-image"
+    assert gemini_images.resolve_model("nano-banana-2") == "gemini-3.1-flash-image"
+    assert gemini_images.resolve_model("nano-banana-2-lite") == "gemini-3.1-flash-lite-image"
+    assert gemini_images.resolve_model("nano-banana-pro") == "gemini-3-pro-image"
     assert ark_embeddings.resolve_model("doubao-vision") == "doubao-embedding-vision-251215"
 
 
@@ -277,9 +282,73 @@ def test_gemini_generate_embeds_local_reference(monkeypatch, tmp_path):
         aspect_ratio="1:1",
     )
 
-    assert result.model == "gemini-3.1-flash-image-preview"
+    assert result.model == "gemini-3.1-flash-image"
     assert "inlineData" in captured["contents"][0]["parts"][1]
     assert captured["kwargs"]["generationConfig"]["imageConfig"]["imageSize"] == "512"
+    assert captured["kwargs"]["generationConfig"]["imageConfig"]["aspectRatio"] == "1:1"
+
+
+def test_gemini_omits_aspect_ratio_when_not_requested(monkeypatch):
+    captured = {}
+
+    def fake_generate_content(model, contents, **kwargs):
+        captured["image_config"] = kwargs["generationConfig"]["imageConfig"]
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {"inlineData": {"data": _TINY_PNG_B64, "mimeType": "image/png"}}
+                        ]
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(gemini_images, "generate_content", fake_generate_content)
+    gemini_images.generate(prompt="match the input ratio", image_size="1K")
+
+    assert captured["image_config"] == {"imageSize": "1K"}
+
+
+@pytest.mark.parametrize(
+    ("model", "image_size", "aspect_ratio"),
+    [
+        ("gemini-image", "1k", "1:1"),
+        ("gemini-image", "1K", "7:1"),
+        ("gemini-image-lite", "2K", "1:1"),
+        ("gemini-image-pro", "1K", "8:1"),
+    ],
+)
+def test_gemini_rejects_unsupported_options_before_request(
+    monkeypatch,
+    model,
+    image_size,
+    aspect_ratio,
+):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("network request should not be sent")
+
+    monkeypatch.setattr(gemini_images, "generate_content", fail_if_called)
+    with pytest.raises(ValueError):
+        gemini_images.generate(
+            model=model,
+            prompt="sprite sheet",
+            image_size=image_size,
+            aspect_ratio=aspect_ratio,
+        )
+
+
+def test_gemini_rejects_more_than_fourteen_references(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("network request should not be sent")
+
+    monkeypatch.setattr(gemini_images, "generate_content", fail_if_called)
+    with pytest.raises(ValueError, match="at most 14 references"):
+        gemini_images.generate(
+            prompt="compose",
+            references=[f"ref-{index}.png" for index in range(15)],
+        )
 
 
 def test_ark_video_content_builder_and_extractor():

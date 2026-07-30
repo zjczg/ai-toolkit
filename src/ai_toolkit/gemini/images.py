@@ -12,10 +12,56 @@ from ai_toolkit._transport import post_json
 from ai_toolkit.config import get_settings
 from ai_toolkit.types import AIToolkitError, GeneratedImage, ImageGenerationResult
 
+DEFAULT_MODEL = "gemini-3.1-flash-image"
+FLASH_MODEL = "gemini-3.1-flash-image"
+LITE_MODEL = "gemini-3.1-flash-lite-image"
+PRO_MODEL = "gemini-3-pro-image"
+MAX_REFERENCE_IMAGES = 14
+
+STANDARD_ASPECT_RATIOS = frozenset(
+    {
+        "1:1",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:3",
+        "4:5",
+        "5:4",
+        "9:16",
+        "16:9",
+        "21:9",
+    }
+)
+FLASH_ASPECT_RATIOS = STANDARD_ASPECT_RATIOS | {"1:4", "4:1", "1:8", "8:1"}
+SUPPORTED_IMAGE_SIZES = frozenset({"512", "1K", "2K", "4K"})
+
 MODEL_ALIASES = {
-    "gemini-image": "gemini-3.1-flash-image-preview",
-    "gemini-3.1-flash-image": "gemini-3.1-flash-image",
+    "gemini-image": FLASH_MODEL,
+    "nano-banana-2": FLASH_MODEL,
+    FLASH_MODEL: FLASH_MODEL,
+    "gemini-image-lite": LITE_MODEL,
+    "nano-banana-2-lite": LITE_MODEL,
+    LITE_MODEL: LITE_MODEL,
+    "gemini-image-pro": PRO_MODEL,
+    "nano-banana-pro": PRO_MODEL,
+    PRO_MODEL: PRO_MODEL,
+    # Deprecated IDs remain available only when callers request them explicitly.
     "gemini-3.1-flash-image-preview": "gemini-3.1-flash-image-preview",
+}
+
+MODEL_LIMITS = {
+    FLASH_MODEL: {
+        "image_sizes": SUPPORTED_IMAGE_SIZES,
+        "aspect_ratios": FLASH_ASPECT_RATIOS,
+    },
+    LITE_MODEL: {
+        "image_sizes": frozenset({"1K"}),
+        "aspect_ratios": STANDARD_ASPECT_RATIOS,
+    },
+    PRO_MODEL: {
+        "image_sizes": frozenset({"1K", "2K", "4K"}),
+        "aspect_ratios": STANDARD_ASPECT_RATIOS,
+    },
 }
 
 
@@ -38,17 +84,31 @@ def generate(
     Local reference images are sent as inline base64 parts; no public URL
     staging is required for Gemini.
     """
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("prompt must be a non-empty string")
+
     settings = get_settings()
     resolved_model = resolve_model(model)
+    reference_values = list(references or [])
+    if len(reference_values) > MAX_REFERENCE_IMAGES:
+        raise ValueError(
+            f"Gemini image generation accepts at most {MAX_REFERENCE_IMAGES} references"
+        )
+    resolved_image_size = _validate_image_size(
+        resolved_model,
+        image_size or settings.gemini_image_size,
+    )
+    resolved_aspect_ratio = _validate_aspect_ratio(resolved_model, aspect_ratio)
+
     parts: list[dict[str, Any]] = [{"text": prompt}]
-    parts.extend(_image_part(ref) for ref in references or [])
+    parts.extend(_image_part(ref) for ref in reference_values)
 
     generation_config = dict(kwargs.pop("generationConfig", {}) or {})
     generation_config.setdefault("responseModalities", ["TEXT", "IMAGE"])
     image_config = dict(generation_config.get("imageConfig", {}) or {})
-    image_config.setdefault("imageSize", image_size or settings.gemini_image_size)
-    if aspect_ratio:
-        image_config.setdefault("aspectRatio", aspect_ratio)
+    image_config.setdefault("imageSize", resolved_image_size)
+    if resolved_aspect_ratio is not None:
+        image_config.setdefault("aspectRatio", resolved_aspect_ratio)
     if image_config:
         generation_config["imageConfig"] = image_config
 
@@ -79,7 +139,7 @@ def generate_content(
     """Submit a generateContent request and return the raw API response.
 
     Required:
-        model:    e.g. "gemini-3.1-flash-image-preview"
+        model:    e.g. "gemini-3.1-flash-image"
         contents: e.g. [{"parts": [{"text": "a cat"}]}]
 
     Optional (via kwargs):
@@ -109,10 +169,30 @@ def generate_content(
 
 def resolve_model(model: str | None = None) -> str:
     settings = get_settings()
-    if model is None or not str(model).strip():
-        return settings.gemini_image_model
-    value = str(model).strip()
+    value = settings.gemini_image_model if model is None else str(model).strip()
+    if not value:
+        value = DEFAULT_MODEL
     return MODEL_ALIASES.get(value, MODEL_ALIASES.get(value.lower(), value))
+
+
+def _validate_image_size(model: str, image_size: object) -> str:
+    value = str(image_size).strip()
+    supported = MODEL_LIMITS.get(model, {}).get("image_sizes", SUPPORTED_IMAGE_SIZES)
+    if value not in supported:
+        choices = ", ".join(sorted(supported))
+        raise ValueError(f"unsupported image_size {value!r} for {model}; choose: {choices}")
+    return value
+
+
+def _validate_aspect_ratio(model: str, aspect_ratio: object | None) -> str | None:
+    if aspect_ratio is None:
+        return None
+    value = str(aspect_ratio).strip()
+    supported = MODEL_LIMITS.get(model, {}).get("aspect_ratios", FLASH_ASPECT_RATIOS)
+    if value not in supported:
+        choices = ", ".join(sorted(supported))
+        raise ValueError(f"unsupported aspect_ratio {value!r} for {model}; choose: {choices}")
+    return value
 
 
 def _image_part(reference: str | Path) -> dict[str, Any]:

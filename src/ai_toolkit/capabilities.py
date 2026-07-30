@@ -98,9 +98,9 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
     },
     "gemini.images.generate": {
         "description": "Generate images with Gemini image models.",
-        "models": ["gemini-image"],
+        "models": ["gemini-image", "gemini-image-lite", "gemini-image-pro"],
         "reference_mode": "inline_base64_for_local_files",
-        "default_params": {"image_size": "2K", "aspect_ratio": "1:1"},
+        "default_params": {"image_size": "1K"},
     },
     "deepseek.text.complete": {
         "description": "Generate text with DeepSeek.",
@@ -212,8 +212,9 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
     "gemini-image": {
         "provider": "gemini",
         "tool": "gemini.images.generate",
-        "model": "gemini-3.1-flash-image-preview",
-        "default_params": {"image_size": "2K", "aspect_ratio": "1:1"},
+        "model": "gemini-3.1-flash-image",
+        "aliases": ["nano-banana-2", "gemini-3.1-flash-image"],
+        "default_params": {"image_size": "1K"},
         "constraints": {
             "supported_image_size_values": ["512", "1K", "2K", "4K"],
             "supported_aspect_ratios": [
@@ -234,7 +235,52 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
             ],
             "fixed_pixel_export_requires_postprocess": True,
         },
-        "last_smoke_tested": "2026-06-29",
+    },
+    "gemini-image-lite": {
+        "provider": "gemini",
+        "tool": "gemini.images.generate",
+        "model": "gemini-3.1-flash-lite-image",
+        "aliases": ["nano-banana-2-lite", "gemini-3.1-flash-lite-image"],
+        "default_params": {"image_size": "1K"},
+        "constraints": {
+            "supported_image_size_values": ["1K"],
+            "supported_aspect_ratios": [
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+            ],
+            "fixed_pixel_export_requires_postprocess": True,
+        },
+    },
+    "gemini-image-pro": {
+        "provider": "gemini",
+        "tool": "gemini.images.generate",
+        "model": "gemini-3-pro-image",
+        "aliases": ["nano-banana-pro", "gemini-3-pro-image"],
+        "default_params": {"image_size": "1K"},
+        "constraints": {
+            "supported_image_size_values": ["1K", "2K", "4K"],
+            "supported_aspect_ratios": [
+                "1:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+            ],
+            "fixed_pixel_export_requires_postprocess": True,
+        },
     },
 }
 

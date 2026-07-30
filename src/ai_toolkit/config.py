@@ -41,7 +41,7 @@ class Settings:
     )
     ark_image_size: str = field(default_factory=lambda: os.getenv("ARK_IMAGE_SIZE", "2K"))
     gemini_image_model: str = field(
-        default_factory=lambda: os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image-preview")
+        default_factory=lambda: os.getenv("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image")
     )
     gemini_image_size: str = field(default_factory=lambda: os.getenv("GEMINI_IMAGE_SIZE", "1K"))
     dashscope_api_key: str = field(default_factory=lambda: os.getenv("DASHSCOPE_API_KEY", ""))

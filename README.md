@@ -38,8 +38,8 @@ export DASHSCOPE_IMAGE_SIZE="2K"
 export DASHSCOPE_SPEECH_MODEL="qwen-audio-3.0-tts-plus"
 export DASHSCOPE_SPEECH_VOICE="longanlingxin"
 
-export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image-preview"
-export GEMINI_IMAGE_SIZE="2K"
+export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image"
+export GEMINI_IMAGE_SIZE="1K"
 
 export DEEPSEEK_CHAT_MODEL="deepseek-v4-flash"
 
@@ -149,15 +149,19 @@ provided, `ai-toolkit` downloads it immediately.
 ```python
 result = gemini.images.generate(
     model="gemini-image",
-    prompt="A clean red square icon.",
+    prompt="Four evenly spaced pixel-art walking frames in one horizontal row.",
     output_path="./gemini.png",
-    image_size="512",
-    aspect_ratio="1:1",
+    image_size="1K",
+    aspect_ratio="4:1",
 )
 ```
 
 Local references are sent as inline base64 parts; no public URL upload is
-required for Gemini.
+required for Gemini. Omit `aspect_ratio` when an input image should determine
+the output ratio. `gemini-image` maps to stable Nano Banana 2 and supports
+`512`, `1K`, `2K`, `4K`, plus the long `4:1` and `8:1` ratios. Lite supports
+only `1K`; Pro supports `1K`, `2K`, and `4K`. Invalid options fail before the
+network request.
 
 ### DeepSeek
 
@@ -235,7 +239,9 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 | DashScope | image | `wan2.7-pro` | `wan2.7-image-pro` |
 | DashScope | speech | `qwen-audio-tts-plus` | `qwen-audio-3.0-tts-plus` |
 | DashScope | speech | `qwen-audio-tts-flash` | `qwen-audio-3.0-tts-flash` |
-| Gemini | image | `gemini-image` | `gemini-3.1-flash-image-preview` |
+| Gemini | image | `gemini-image`, `nano-banana-2` | `gemini-3.1-flash-image` |
+| Gemini | image | `gemini-image-lite`, `nano-banana-2-lite` | `gemini-3.1-flash-lite-image` |
+| Gemini | image | `gemini-image-pro`, `nano-banana-pro` | `gemini-3-pro-image` |
 | DeepSeek | text | `v4-flash` | `deepseek-v4-flash` |
 | DeepSeek | text | `v4-pro` | `deepseek-v4-pro` |
 | Aliyun | image segmentation | `viapi-segment-commodity` | `SegmentCommodity` |
