@@ -260,10 +260,13 @@ print(scene.asset_prompt, scene.event_summary)
 ```
 
 `prompt_fragment()` renders a compact JSON example for explicit prompt
-composition. ARK sends `output_type.model_json_schema()` through its native
-JSON Schema format; DeepSeek continues to use JSON-object mode. Both providers
-validate the parsed response with Pydantic and raise `StructuredOutputError`
-when decoding or validation fails.
+composition. It resolves local `$ref` / `$defs` definitions and renders nested
+objects plus required array items; optional nested objects with a `null`
+default stay `null` unless the field supplies an explicit example. ARK sends
+`output_type.model_json_schema()` through its native JSON Schema format;
+DeepSeek continues to use JSON-object mode. Both providers validate the parsed
+response with Pydantic and raise `StructuredOutputError` when decoding or
+validation fails.
 
 The existing `schema=` form remains available for dictionary results and keeps
 its non-raising `parsed_json` / `schema_error` behavior. Do not pass `schema`
