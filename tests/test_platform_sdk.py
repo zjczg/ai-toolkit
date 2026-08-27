@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from ai_toolkit import GeneratedAudio, __version__, capabilities, help
+from ai_toolkit import (
+    GeneratedAudio,
+    ImageGenerationBatchTask,
+    __version__,
+    capabilities,
+    help,
+)
 from ai_toolkit.aliyun import images as aliyun_images
 from ai_toolkit.ark import embeddings as ark_embeddings
 from ai_toolkit.ark import images as ark_images
@@ -29,6 +35,8 @@ def test_capabilities_use_platform_scoped_tool_names():
     assert "ark.text.complete_json" in tools
     assert "deepseek.text.complete" in tools
     assert "dashscope.speech.synthesize" in tools
+    assert "gemini.images.create_batch" in tools
+    assert "gemini.images.get_batch" in tools
     assert "aliyun.images.segment_commodity" in tools
     assert "aliyun.images.segment_hd_body" in tools
     assert "images.generate" not in tools
@@ -36,7 +44,11 @@ def test_capabilities_use_platform_scoped_tool_names():
 
 
 def test_model_aliases_resolve_to_raw_provider_ids():
-    assert ark_images.resolve_model("seedream-5-lite") == "doubao-seedream-5-0-260128"
+    assert ark_images.resolve_model("seedream-5") == "doubao-seedream-5-0-260128"
+    assert (
+        ark_images.resolve_model("seedream-5-pro")
+        == "doubao-seedream-5-0-pro-260628"
+    )
     assert ark_images.resolve_model("seedream-4.5") == "doubao-seedream-4-5-251128"
     assert ark_videos.resolve_model("seedance-2") == "doubao-seedance-2-0-260128"
     assert ark_text.resolve_model("doubao-pro") == "doubao-seed-2-0-pro-260215"
@@ -138,13 +150,90 @@ def test_ark_image_generate_infers_seedream_5_output_format(monkeypatch, tmp_pat
     monkeypatch.setattr(ark_images, "create_image_generation", fake_create_image_generation)
 
     ark_images.generate(
-        model="seedream-5-lite",
+        model="seedream-5",
         prompt="red square",
         output_path=tmp_path / "out.jpg",
     )
 
     assert captured["model"] == "doubao-seedream-5-0-260128"
     assert captured["kwargs"]["output_format"] == "jpeg"
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["seedream-5-lite", "seedream-5.0-lite", "doubao-5.0-lite"],
+)
+def test_ark_image_warns_for_incorrect_seedream_5_lite_aliases(model):
+    with pytest.warns(DeprecationWarning, match="use 'seedream-5'"):
+        resolved = ark_images.resolve_model(model)
+
+    assert resolved == "doubao-seedream-5-0-260128"
+
+
+def test_ark_image_seedream_5_pro_uses_pro_contract(monkeypatch):
+    captured = {}
+
+    def fake_create_image_generation(model, prompt, **kwargs):
+        captured["model"] = model
+        captured["kwargs"] = kwargs
+        return {"data": [{"b64_json": _TINY_PNG_B64}]}
+
+    monkeypatch.setattr(ark_images, "create_image_generation", fake_create_image_generation)
+
+    ark_images.generate(
+        model="seedream-5-pro",
+        prompt="red square",
+        size="1k",
+    )
+
+    assert captured["model"] == "doubao-seedream-5-0-pro-260628"
+    assert captured["kwargs"]["size"] == "1K"
+    assert captured["kwargs"]["output_format"] == "png"
+    assert "sequential_image_generation" not in captured["kwargs"]
+    assert "stream" not in captured["kwargs"]
+
+
+def test_ark_image_seedream_5_pro_rejects_4k_before_network(monkeypatch):
+    monkeypatch.setattr(
+        ark_images,
+        "create_image_generation",
+        lambda *args, **kwargs: pytest.fail("network request should not be sent"),
+    )
+
+    with pytest.raises(ark_images.AIToolkitError, match="unsupported size"):
+        ark_images.generate(
+            model="seedream-5-pro",
+            prompt="red square",
+            size="4K",
+        )
+
+
+def test_ark_image_seedream_5_pro_rejects_more_than_ten_references(monkeypatch):
+    monkeypatch.setattr(
+        ark_images,
+        "create_image_generation",
+        lambda *args, **kwargs: pytest.fail("network request should not be sent"),
+    )
+
+    with pytest.raises(ark_images.AIToolkitError, match="max 10"):
+        ark_images.generate(
+            model="seedream-5-pro",
+            prompt="compose",
+            references=[f"https://example.test/{index}.png" for index in range(11)],
+        )
+
+
+def test_seedream_5_pro_capabilities_publish_resolution_contract():
+    model = capabilities.get_image_model("seedream-5-pro")
+
+    assert model["model"] == "doubao-seedream-5-0-pro-260628"
+    assert model["constraints"]["supported_size_values"] == [
+        "1K",
+        "2K",
+        "<width>x<height>",
+    ]
+    assert model["constraints"]["sequential_image_generation"] is False
+    assert model["constraints"]["stream"] is False
 
 
 def test_ark_image_seedream_4_rejects_output_format_override():
@@ -158,6 +247,34 @@ def test_ark_image_seedream_4_rejects_output_format_override():
         assert "does not support output_format" in str(exc)
     else:
         raise AssertionError("expected AIToolkitError")
+
+
+def test_ark_image_generation_encodes_local_reference(monkeypatch, tmp_path):
+    reference = tmp_path / "character.png"
+    reference.write_bytes(b"png-data")
+    captured = {}
+
+    def fake_create_image_generation(model, prompt, **kwargs):
+        captured["model"] = model
+        captured["prompt"] = prompt
+        captured["kwargs"] = kwargs
+        return {"data": [{"b64_json": _TINY_PNG_B64}]}
+
+    monkeypatch.setattr(
+        ark_images,
+        "create_image_generation",
+        fake_create_image_generation,
+    )
+
+    ark_images.generate(
+        model="seedream-4.5",
+        prompt="paper doll",
+        references=[reference],
+    )
+
+    assert captured["kwargs"]["image"] == [
+        "data:image/png;base64,cG5nLWRhdGE="
+    ]
 
 
 def test_dashscope_image_generation_supports_nine_references(monkeypatch):
@@ -388,6 +505,207 @@ def test_gemini_omits_aspect_ratio_when_not_requested(monkeypatch):
     gemini_images.generate(prompt="match the input ratio", image_size="1K")
 
     assert captured["image_config"] == {"imageSize": "1K"}
+
+
+def test_gemini_auto_image_size_omits_resolution(monkeypatch):
+    captured = {}
+
+    def fake_generate_content(model, contents, **kwargs):
+        captured["image_config"] = kwargs["generationConfig"]["imageConfig"]
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "inlineData": {
+                                    "data": _TINY_PNG_B64,
+                                    "mimeType": "image/png",
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(gemini_images, "generate_content", fake_generate_content)
+    gemini_images.generate(
+        model="gemini-image",
+        prompt="model decides the resolution",
+        image_size="auto",
+        aspect_ratio="16:9",
+    )
+
+    assert captured["image_config"] == {"aspectRatio": "16:9"}
+
+
+def test_gemini_image_batch_builds_keyed_inline_requests(monkeypatch):
+    captured = {}
+
+    def fake_batch_generate_content(model, batch):
+        captured["model"] = model
+        captured["batch"] = batch
+        return {
+            "name": "batches/batch-123",
+            "state": "JOB_STATE_PENDING",
+        }
+
+    monkeypatch.setattr(
+        gemini_images,
+        "batch_generate_content",
+        fake_batch_generate_content,
+    )
+
+    task = gemini_images.create_batch(
+        model="gemini-image-lite",
+        prompts={"coop": "wooden coop", "trough": "wooden trough"},
+        image_size="auto",
+        aspect_ratio=None,
+        display_name="pasture-batch-1",
+    )
+
+    assert task.task_id == "batches/batch-123"
+    assert task.model == "gemini-3.1-flash-lite-image"
+    assert captured["model"] == "gemini-3.1-flash-lite-image"
+    requests = captured["batch"]["input_config"]["requests"]["requests"]
+    assert [item["metadata"]["key"] for item in requests] == ["coop", "trough"]
+    assert requests[0]["request"]["generationConfig"] == {
+        "responseModalities": ["TEXT", "IMAGE"]
+    }
+
+
+def test_gemini_image_batch_result_keeps_per_request_errors():
+    task = ImageGenerationBatchTask(
+        provider="gemini",
+        model="gemini-3.1-flash-lite-image",
+        task_id="batches/batch-123",
+        status="JOB_STATE_SUCCEEDED",
+        raw_response={
+            "name": "batches/batch-123",
+            "state": "JOB_STATE_SUCCEEDED",
+            "dest": {
+                "inlinedResponses": [
+                    {
+                        "metadata": {"key": "coop"},
+                        "response": {
+                            "candidates": [
+                                {
+                                    "content": {
+                                        "parts": [
+                                            {
+                                                "inlineData": {
+                                                    "data": _TINY_PNG_B64,
+                                                    "mimeType": "image/png",
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                    },
+                    {
+                        "metadata": {"key": "trough"},
+                        "error": {"code": 429, "message": "quota"},
+                    },
+                ]
+            },
+        },
+    )
+
+    result = gemini_images.batch_result(
+        task,
+        prompts={"coop": "wooden coop", "trough": "wooden trough"},
+    )
+
+    assert result.items[0].key == "coop"
+    assert result.items[0].result is not None
+    assert result.items[0].result.first_image().b64_json == _TINY_PNG_B64
+    assert result.items[1].key == "trough"
+    assert result.items[1].error == '{"code": 429, "message": "quota"}'
+
+
+def test_gemini_batch_create_disables_transport_retries(monkeypatch):
+    captured = {}
+
+    class Settings:
+        gemini_api_key = "test-key"
+        gemini_base_url = "https://example.test/v1beta"
+
+    def fake_post_json(url, payload, **kwargs):
+        captured["url"] = url
+        captured["payload"] = payload
+        captured["kwargs"] = kwargs
+        return {"name": "batches/batch-123"}
+
+    monkeypatch.setattr(gemini_images, "get_settings", lambda: Settings())
+    monkeypatch.setattr(gemini_images, "post_json", fake_post_json)
+
+    gemini_images.batch_generate_content(
+        "gemini-3.1-flash-lite-image",
+        {"input_config": {}},
+    )
+
+    assert captured["url"].endswith(
+        "/models/gemini-3.1-flash-lite-image:batchGenerateContent"
+    )
+    assert captured["kwargs"]["max_retries"] == 0
+
+
+def test_gemini_batch_rejects_oversize_inline_payload(monkeypatch):
+    class Settings:
+        gemini_api_key = "test-key"
+        gemini_base_url = "https://example.test/v1beta"
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("network request should not be sent")
+
+    monkeypatch.setattr(gemini_images, "get_settings", lambda: Settings())
+    monkeypatch.setattr(gemini_images, "post_json", fail_if_called)
+    monkeypatch.setattr(gemini_images, "MAX_INLINE_BATCH_BYTES", 20)
+
+    with pytest.raises(ValueError, match="smaller than 20 MB"):
+        gemini_images.batch_generate_content(
+            "gemini-3.1-flash-lite-image",
+            {"input_config": {"requests": {"requests": []}}},
+        )
+
+
+def test_gemini_find_batch_follows_pagination(monkeypatch):
+    calls = []
+
+    def fake_list_batch_generations(*, page_size, page_token=None):
+        calls.append((page_size, page_token))
+        if page_token is None:
+            return {
+                "batches": [],
+                "nextPageToken": "page-2",
+            }
+        return {
+            "batches": [
+                {
+                    "name": "batches/batch-123",
+                    "displayName": "pasture-batch-1",
+                    "state": "JOB_STATE_PENDING",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        gemini_images,
+        "list_batch_generations",
+        fake_list_batch_generations,
+    )
+
+    task = gemini_images.find_batch(
+        display_name="pasture-batch-1",
+        model="gemini-image-lite",
+    )
+
+    assert calls == [(100, None), (100, "page-2")]
+    assert task is not None
+    assert task.task_id == "batches/batch-123"
 
 
 @pytest.mark.parametrize(

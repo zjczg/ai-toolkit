@@ -91,6 +91,13 @@ class Settings:
         default_factory=lambda: _env("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image")
     )
     gemini_image_size: str = field(default_factory=lambda: _env("GEMINI_IMAGE_SIZE", "1K"))
+    minimax_api_key: str = field(default_factory=lambda: _env("MINIMAX_API_KEY"))
+    minimax_base_url: str = field(
+        default_factory=lambda: _env("MINIMAX_BASE_URL", "https://api.minimax.io")
+    )
+    minimax_video_model: str = field(
+        default_factory=lambda: _env("MINIMAX_VIDEO_MODEL", "MiniMax-H3")
+    )
     dashscope_api_key: str = field(default_factory=lambda: _env("DASHSCOPE_API_KEY"))
     dashscope_base_url: str = field(
         default_factory=lambda: _env("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com")

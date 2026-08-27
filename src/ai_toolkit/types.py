@@ -76,6 +76,39 @@ class ImageGenerationResult:
 
 
 @dataclass(slots=True)
+class ImageGenerationBatchTask:
+    """Provider-agnostic asynchronous image batch state."""
+
+    provider: str
+    model: str
+    task_id: str
+    status: str = ""
+    raw_response: dict[str, Any] | None = None
+    request: dict[str, Any] | None = None
+
+
+@dataclass(slots=True)
+class ImageGenerationBatchItem:
+    """One keyed response inside an image generation batch."""
+
+    key: str
+    result: ImageGenerationResult | None = None
+    error: str | None = None
+
+
+@dataclass(slots=True)
+class ImageGenerationBatchResult:
+    """Completed image batch with independent keyed results."""
+
+    provider: str
+    model: str
+    task_id: str
+    status: str
+    items: list[ImageGenerationBatchItem]
+    raw_response: dict[str, Any] | None = None
+
+
+@dataclass(slots=True)
 class GeneratedAudio:
     """A provider-agnostic generated audio handle."""
 

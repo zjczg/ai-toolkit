@@ -28,7 +28,11 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
     },
     "gemini": {
         "name": "Gemini",
-        "tools": ["gemini.images.generate"],
+        "tools": [
+            "gemini.images.generate",
+            "gemini.images.create_batch",
+            "gemini.images.get_batch",
+        ],
         "env": ["GEMINI_API_KEY"],
     },
     "deepseek": {
@@ -51,13 +55,11 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
 _TOOL_SPECS: dict[str, dict[str, Any]] = {
     "ark.images.generate": {
         "description": "Generate images with ARK Seedream models.",
-        "models": ["seedream-5-lite", "seedream-4.5"],
-        "reference_mode": "public_url_upload_for_local_files",
+        "models": ["seedream-5", "seedream-5-pro", "seedream-4.5"],
+        "reference_mode": "inline_base64_for_local_files",
         "default_params": {
             "size": "2K",
             "response_format": "url",
-            "sequential_image_generation": "disabled",
-            "stream": False,
             "watermark": False,
         },
     },
@@ -121,6 +123,17 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "models": ["gemini-image", "gemini-image-lite", "gemini-image-pro"],
         "reference_mode": "inline_base64_for_local_files",
         "default_params": {"image_size": "1K"},
+    },
+    "gemini.images.create_batch": {
+        "description": "Submit keyed text-to-image prompts as one inline Gemini batch.",
+        "models": ["gemini-image-lite"],
+        "reference_mode": "not_supported",
+        "default_params": {"image_size": "1K"},
+    },
+    "gemini.images.get_batch": {
+        "description": "Get the latest state for one Gemini image batch.",
+        "models": ["gemini-image-lite"],
+        "default_params": {},
     },
     "deepseek.text.complete": {
         "description": "Generate text with DeepSeek.",
@@ -188,11 +201,11 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
 }
 
 _IMAGE_MODELS: dict[str, dict[str, Any]] = {
-    "seedream-5-lite": {
+    "seedream-5": {
         "provider": "ark",
         "tool": "ark.images.generate",
         "model": "doubao-seedream-5-0-260128",
-        "aliases": ["seedream-5.0-lite", "doubao-5.0-lite"],
+        "aliases": ["seedream-5.0", "doubao-5.0"],
         "default_params": {
             "size": "2K",
             "output_format": "png",
@@ -207,7 +220,27 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
             "max_reference_images": 14,
             "fixed_pixel_export_requires_postprocess": True,
         },
-        "last_smoke_tested": "2026-06-29",
+        "last_smoke_tested": "2026-08-25",
+    },
+    "seedream-5-pro": {
+        "provider": "ark",
+        "tool": "ark.images.generate",
+        "model": "doubao-seedream-5-0-pro-260628",
+        "aliases": ["seedream-5.0-pro", "doubao-5.0-pro"],
+        "default_params": {
+            "size": "2K",
+            "output_format": "png",
+            "response_format": "url",
+            "watermark": False,
+        },
+        "constraints": {
+            "supported_size_values": ["1K", "2K", "<width>x<height>"],
+            "supported_output_formats": ["png", "jpeg"],
+            "max_reference_images": 10,
+            "sequential_image_generation": False,
+            "stream": False,
+            "fixed_pixel_export_requires_postprocess": True,
+        },
     },
     "seedream-4.5": {
         "provider": "ark",
@@ -266,7 +299,7 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
         "aliases": ["nano-banana-2", "gemini-3.1-flash-image"],
         "default_params": {"image_size": "1K"},
         "constraints": {
-            "supported_image_size_values": ["512", "1K", "2K", "4K"],
+            "supported_image_size_values": ["auto", "512", "1K", "2K", "4K"],
             "supported_aspect_ratios": [
                 "1:1",
                 "1:4",
@@ -293,7 +326,7 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
         "aliases": ["nano-banana-2-lite", "gemini-3.1-flash-lite-image"],
         "default_params": {"image_size": "1K"},
         "constraints": {
-            "supported_image_size_values": ["1K"],
+            "supported_image_size_values": ["auto", "1K"],
             "supported_aspect_ratios": [
                 "1:1",
                 "2:3",
@@ -316,7 +349,7 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
         "aliases": ["nano-banana-pro", "gemini-3-pro-image"],
         "default_params": {"image_size": "1K"},
         "constraints": {
-            "supported_image_size_values": ["1K", "2K", "4K"],
+            "supported_image_size_values": ["auto", "1K", "2K", "4K"],
             "supported_aspect_ratios": [
                 "1:1",
                 "2:3",

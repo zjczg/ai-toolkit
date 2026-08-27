@@ -27,7 +27,7 @@ export DEEPSEEK_API_KEY="..."
 export ALIYUN_ACCESS_KEY_ID="..."
 export ALIYUN_ACCESS_KEY_SECRET="..."
 
-# Used internally when ARK / DashScope need public reference URLs.
+# Used internally when a provider requires public reference URLs.
 export UPLOAD_SSH_TARGET="root@example.com"
 export UPLOAD_IDENTITY_FILE="~/.ssh/id_ed25519"
 export UPLOAD_REMOTE_DIR="/var/www/images"
@@ -74,13 +74,25 @@ Image generation:
 
 ```python
 result = ark.images.generate(
-    model="seedream-5-lite",  # or "seedream-4.5"
+    model="seedream-5",  # or "seedream-5-pro" / "seedream-4.5"
     prompt="A flat red square icon on a white background.",
     output_path="./out.png",
     size="2K",
 )
 print(result.model, result.first_image().local_path)
 ```
+
+Local image references for Seedream are sent as inline Base64 data URLs; no
+public upload is required.
+
+`seedream-5` accepts `2K`, `3K`, `4K`, or an explicit `<width>x<height>`
+value. `seedream-5-pro` accepts `1K`, `2K`, or explicit dimensions; it does
+not support `3K`/`4K`, streaming, or sequential image generation. The
+provider may align explicit dimensions, so callers must inspect the returned
+image size instead of treating the request as a fixed-pixel export contract.
+The old `seedream-5-lite` / `doubao-5.0-lite` names remain compatibility-only
+aliases for standard Seedream 5.0 and emit `DeprecationWarning`; new code must
+not use them.
 
 Video generation:
 
@@ -196,6 +208,38 @@ the output ratio. `gemini-image` maps to stable Nano Banana 2 and supports
 `512`, `1K`, `2K`, `4K`, plus the long `4:1` and `8:1` ratios. Lite supports
 only `1K`; Pro supports `1K`, `2K`, and `4K`. Invalid options fail before the
 network request.
+
+Small non-urgent text-to-image sets can use Gemini's inline Batch API:
+
+```python
+task = gemini.images.create_batch(
+    model="gemini-image-lite",
+    prompts={
+        "coop": "A wooden chicken coop on a flat magenta background.",
+        "trough": "A wooden chicken trough on a flat magenta background.",
+    },
+    image_size="auto",
+    display_name="pasture-props-2026-08-04",
+)
+
+# Query this again later; Batch completion may take up to 24 hours.
+task = gemini.images.get_batch(task_id=task.task_id, model=task.model)
+if task.status == "JOB_STATE_SUCCEEDED":
+    result = gemini.images.batch_result(
+        task,
+        prompts={
+            "coop": "A wooden chicken coop on a flat magenta background.",
+            "trough": "A wooden chicken trough on a flat magenta background.",
+        },
+    )
+```
+
+`create_batch` accepts keyed prompts only: reference-image and JSONL batches
+are intentionally outside this initial interface. Inline payloads at or above
+20 MB are rejected locally. Batch creation disables
+transport retries because Google's create operation is not idempotent. Use
+`find_batch(display_name=...)` to recover a task when submission completed but
+the client did not receive its response.
 
 ### DeepSeek
 
@@ -341,7 +385,8 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 
 | Platform | Ability | Aliases | Raw model |
 |---|---|---|---|
-| ARK | image | `seedream-5-lite` | `doubao-seedream-5-0-260128` |
+| ARK | image | `seedream-5` | `doubao-seedream-5-0-260128` |
+| ARK | image | `seedream-5-pro` | `doubao-seedream-5-0-pro-260628` |
 | ARK | image | `seedream-4.5` | `doubao-seedream-4-5-251128` |
 | ARK | video | `seedance-2` | `doubao-seedance-2-0-260128` |
 | ARK | text | `doubao-pro` | `doubao-seed-2-0-pro-260215` |
