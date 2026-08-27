@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from ai_toolkit import capabilities
 from ai_toolkit.minimax import videos
 from ai_toolkit.types import AIToolkitError, VideoGenerationTask
 
@@ -116,3 +117,10 @@ def test_wait_surfaces_provider_failure(monkeypatch: pytest.MonkeyPatch) -> None
 
     with pytest.raises(AIToolkitError, match="blocked"):
         videos.wait(task_id="task-1")
+
+
+def test_capability_defaults_do_not_add_unsupported_video_options() -> None:
+    assert capabilities.normalize_video_options("minimax-h3") == {
+        "duration": 4,
+        "resolution": "768P",
+    }

@@ -13,6 +13,7 @@ CONFIG_KEYS = (
     "ARK_API_KEY",
     "DEEPSEEK_API_KEY",
     "GEMINI_API_KEY",
+    "GRSAI_API_KEY",
     "AI_TOOLKIT_HTTP_MAX_RETRIES",
     "XDG_CONFIG_HOME",
 )
@@ -92,6 +93,19 @@ def test_user_fallback_uses_xdg_path_without_mutating_environ(tmp_path: Path) ->
     assert "GEMINI_API_KEY" not in os.environ
     assert get_settings().gemini_api_key == "user-gemini"
     assert "GEMINI_API_KEY" not in os.environ
+
+
+def test_grsai_has_independent_credentials_and_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GRSAI_API_KEY", "grs-key")
+
+    settings = get_settings()
+
+    assert settings.grsai_api_key == "grs-key"
+    assert settings.grsai_base_url == "https://grsaiapi.com"
+    assert settings.grsai_image_model == "nano-banana-2"
+    assert settings.grsai_image_size == "1K"
 
 
 def test_explicit_user_file_path_is_supported(

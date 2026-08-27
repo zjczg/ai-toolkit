@@ -35,6 +35,16 @@ _PROVIDERS: dict[str, dict[str, Any]] = {
         ],
         "env": ["GEMINI_API_KEY"],
     },
+    "grsai": {
+        "name": "GRS.AI",
+        "tools": ["grsai.images.generate"],
+        "env": ["GRSAI_API_KEY"],
+    },
+    "minimax": {
+        "name": "MiniMax",
+        "tools": ["minimax.videos.generate"],
+        "env": ["MINIMAX_API_KEY"],
+    },
     "deepseek": {
         "name": "DeepSeek",
         "tools": ["deepseek.text.complete", "deepseek.text.complete_json"],
@@ -134,6 +144,18 @@ _TOOL_SPECS: dict[str, dict[str, Any]] = {
         "description": "Get the latest state for one Gemini image batch.",
         "models": ["gemini-image-lite"],
         "default_params": {},
+    },
+    "grsai.images.generate": {
+        "description": "Generate images with GRS.AI Nano Banana 2.",
+        "models": ["grsai-nano-banana-2"],
+        "reference_mode": "inline_base64_for_local_files",
+        "default_params": {"image_size": "1K"},
+    },
+    "minimax.videos.generate": {
+        "description": "Submit and optionally wait for MiniMax H3 video generation.",
+        "models": ["minimax-h3"],
+        "reference_mode": "inline_base64_for_local_files",
+        "default_params": {"duration": 4, "resolution": "768P"},
     },
     "deepseek.text.complete": {
         "description": "Generate text with DeepSeek.",
@@ -365,6 +387,35 @@ _IMAGE_MODELS: dict[str, dict[str, Any]] = {
             "fixed_pixel_export_requires_postprocess": True,
         },
     },
+    "grsai-nano-banana-2": {
+        "provider": "grsai",
+        "tool": "grsai.images.generate",
+        "model": "nano-banana-2",
+        "aliases": ["grsai-image"],
+        "default_params": {"image_size": "1K"},
+        "constraints": {
+            "supported_image_size_values": ["auto", "1K", "2K", "4K"],
+            "supported_aspect_ratios": [
+                "auto",
+                "1:1",
+                "1:4",
+                "4:1",
+                "1:8",
+                "8:1",
+                "2:3",
+                "3:2",
+                "3:4",
+                "4:3",
+                "4:5",
+                "5:4",
+                "9:16",
+                "16:9",
+                "21:9",
+            ],
+            "max_reference_images": 6,
+            "fixed_pixel_export_requires_postprocess": True,
+        },
+    },
 }
 
 _VIDEO_MODELS: dict[str, dict[str, Any]] = {
@@ -437,6 +488,28 @@ _VIDEO_MODELS: dict[str, dict[str, Any]] = {
             "recommended_resolution_values": ["720p", "1080p"],
         },
         "last_smoke_tested": "2026-06-29",
+    },
+    "minimax-h3": {
+        "provider": "minimax",
+        "tool": "minimax.videos.generate",
+        "model": "MiniMax-H3",
+        "aliases": ["h3", "MiniMax-H3"],
+        "default_params": {"duration": 4, "resolution": "768P"},
+        "constraints": {
+            "async_task": True,
+            "reference_images": "0-9",
+            "supported_ratio_values": [
+                "adaptive",
+                "21:9",
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+            ],
+            "recommended_duration_values": list(range(4, 16)),
+            "recommended_resolution_values": ["768P", "2K"],
+        },
     },
 }
 
@@ -614,7 +687,11 @@ def normalize_video_options(model: str, options: dict[str, Any] | None = None) -
     constraints = config.get("constraints", {})
 
     ratios = constraints.get("supported_ratio_values") or []
-    if ratios and params.get("ratio") not in ratios:
+    if (
+        ratios
+        and params.get("ratio") is not None
+        and params.get("ratio") not in ratios
+    ):
         params["ratio"] = config["default_params"]["ratio"]
 
     durations = constraints.get("recommended_duration_values") or []
@@ -627,8 +704,12 @@ def normalize_video_options(model: str, options: dict[str, Any] | None = None) -
     if resolutions and params.get("resolution") not in resolutions:
         params["resolution"] = config["default_params"]["resolution"]
 
-    params["watermark"] = _coerce_bool(params.get("watermark"), False)
-    params["generate_audio"] = _coerce_bool(params.get("generate_audio"), False)
+    if "watermark" in params:
+        params["watermark"] = _coerce_bool(params.get("watermark"), False)
+    if "generate_audio" in params:
+        params["generate_audio"] = _coerce_bool(
+            params.get("generate_audio"), False
+        )
     return params
 
 

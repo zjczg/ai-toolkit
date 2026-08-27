@@ -1,8 +1,16 @@
 """ai-toolkit — platform-scoped AI model SDK."""
 
-__version__ = "0.9.0"
-
-from ai_toolkit import aliyun, ark, capabilities, dashscope, deepseek, gemini
+from ai_toolkit import (
+    aliyun,
+    ark,
+    capabilities,
+    dashscope,
+    deepseek,
+    gemini,
+    grsai,
+    minimax,
+)
+from ai_toolkit._version import VERSION as __version__
 from ai_toolkit.config import Settings, get_settings
 from ai_toolkit.help import help, list_interfaces
 from ai_toolkit.structured import JsonOutputModel, StructuredOutputError
@@ -32,6 +40,8 @@ __all__ = [
     "dashscope",
     "deepseek",
     "gemini",
+    "grsai",
+    "minimax",
     "AIToolkitError",
     "ChatCompletionResult",
     "JsonOutputModel",

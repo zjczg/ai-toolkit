@@ -23,6 +23,8 @@ Required as needed:
 export ARK_API_KEY="..."
 export DASHSCOPE_API_KEY="..."
 export GEMINI_API_KEY="..."
+export GRSAI_API_KEY="..."
+export MINIMAX_API_KEY="..."
 export DEEPSEEK_API_KEY="..."
 export ALIYUN_ACCESS_KEY_ID="..."
 export ALIYUN_ACCESS_KEY_SECRET="..."
@@ -55,6 +57,13 @@ export DASHSCOPE_SPEECH_VOICE="longanlingxin"
 export GEMINI_IMAGE_MODEL="gemini-3.1-flash-image"
 export GEMINI_IMAGE_SIZE="1K"
 
+export GRSAI_BASE_URL="https://grsaiapi.com"
+export GRSAI_IMAGE_MODEL="nano-banana-2"
+export GRSAI_IMAGE_SIZE="1K"
+
+export MINIMAX_BASE_URL="https://api.minimax.io"
+export MINIMAX_VIDEO_MODEL="MiniMax-H3"
+
 export DEEPSEEK_CHAT_MODEL="deepseek-v4-flash"
 
 export ALIYUN_VIAPI_REGION="cn-shanghai"
@@ -65,7 +74,7 @@ export ALIYUN_VIAPI_REGION="cn-shanghai"
 Use platform modules directly:
 
 ```python
-from ai_toolkit import aliyun, ark, dashscope, deepseek, gemini
+from ai_toolkit import aliyun, ark, dashscope, deepseek, gemini, grsai, minimax
 ```
 
 ### ARK / Doubao
@@ -241,6 +250,44 @@ transport retries because Google's create operation is not idempotent. Use
 `find_batch(display_name=...)` to recover a task when submission completed but
 the client did not receive its response.
 
+### GRS.AI
+
+GRS.AI is an independent provider entry and never reuses Gemini credentials:
+
+```python
+result = grsai.images.generate(
+    model="grsai-image",
+    prompt="A clean pixel-art farmer on a flat magenta background.",
+    references=["./farmer-reference.png"],
+    output_path="./grsai-farmer.png",
+    image_size="1K",
+    aspect_ratio="1:1",
+)
+print(result.provider, result.model)
+```
+
+`grsai-image` resolves only to GRS.AI `nano-banana-2`. The client uses the
+provider's Gemini-compatible endpoint, supports 1K/2K/4K and the long 4:1/8:1
+ratios, and sends local references as inline Base64. Set `GRSAI_BASE_URL` to
+`https://grsai.dakka.com.cn` when the documented China-direct host is needed.
+The SDK does not automatically fall back between GRS.AI and official Gemini.
+
+### MiniMax
+
+```python
+result = minimax.videos.generate(
+    model="minimax-h3",
+    prompt="The character walks in place while facing right.",
+    first_frame="./character.png",
+    output_path="./walk.mp4",
+    duration=4,
+    resolution="768P",
+)
+```
+
+MiniMax H3 tasks are asynchronous. Local keyframes and reference images are
+validated and sent as inline Base64 data URLs.
+
 ### DeepSeek
 
 ```python
@@ -401,6 +448,8 @@ Aliyun `SegmentCommodity` was live smoke-tested on 2026-06-30 with a synthetic i
 | Gemini | image | `gemini-image`, `nano-banana-2` | `gemini-3.1-flash-image` |
 | Gemini | image | `gemini-image-lite`, `nano-banana-2-lite` | `gemini-3.1-flash-lite-image` |
 | Gemini | image | `gemini-image-pro`, `nano-banana-pro` | `gemini-3-pro-image` |
+| GRS.AI | image | `grsai-image`, `grsai-nano-banana-2` | `nano-banana-2` |
+| MiniMax | video | `minimax-h3`, `h3` | `MiniMax-H3` |
 | DeepSeek | text | `v4-flash` | `deepseek-v4-flash` |
 | DeepSeek | text | `v4-pro` | `deepseek-v4-pro` |
 | Aliyun | image matting | `aidge-image-matting` | `ImageMatting` |

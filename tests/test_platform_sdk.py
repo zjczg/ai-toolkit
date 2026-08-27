@@ -21,10 +21,12 @@ from ai_toolkit.dashscope import speech as dashscope_speech
 from ai_toolkit.dashscope import videos as dashscope_videos
 from ai_toolkit.deepseek import text as deepseek_text
 from ai_toolkit.gemini import images as gemini_images
+from ai_toolkit.grsai import images as grsai_images
+from ai_toolkit.minimax import videos as minimax_videos
 
 
 def test_version_is_updated():
-    assert __version__ == "0.9.0"
+    assert __version__ == "0.10.0"
     assert help()["version"] == __version__
 
 
@@ -37,6 +39,8 @@ def test_capabilities_use_platform_scoped_tool_names():
     assert "dashscope.speech.synthesize" in tools
     assert "gemini.images.create_batch" in tools
     assert "gemini.images.get_batch" in tools
+    assert "grsai.images.generate" in tools
+    assert "minimax.videos.generate" in tools
     assert "aliyun.images.segment_commodity" in tools
     assert "aliyun.images.segment_hd_body" in tools
     assert "images.generate" not in tools
@@ -63,6 +67,8 @@ def test_model_aliases_resolve_to_raw_provider_ids():
     assert gemini_images.resolve_model("nano-banana-2") == "gemini-3.1-flash-image"
     assert gemini_images.resolve_model("nano-banana-2-lite") == "gemini-3.1-flash-lite-image"
     assert gemini_images.resolve_model("nano-banana-pro") == "gemini-3-pro-image"
+    assert grsai_images.resolve_model("grsai-image") == "nano-banana-2"
+    assert minimax_videos.resolve_model("minimax-h3") == "MiniMax-H3"
     assert ark_embeddings.resolve_model("doubao-vision") == "doubao-embedding-vision-251215"
 
 
