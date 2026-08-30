@@ -31,7 +31,7 @@ dev = [
 package-dir = {"" = "src"}
 
 [tool.setuptools.dynamic]
-version = {attr = "ai_toolkit.__version__"}
+version = {attr = "ai_toolkit._version.VERSION"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ai_toolkit import capabilities
+from ai_toolkit._version import VERSION
 
 
 def list_interfaces() -> list[str]:
@@ -14,7 +15,7 @@ def list_interfaces() -> list[str]:
 def help(name: str | None = None) -> dict[str, Any]:
     if name is None:
         return {
-            "version": "0.9.0",
+            "version": VERSION,
             "tools": capabilities.list_tools(),
             "providers": capabilities.list_providers(),
         }

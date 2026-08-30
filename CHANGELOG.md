@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.0
+
+- Added the independent `grsai.images.generate` provider for GRS.AI
+  `nano-banana-2` through its Gemini-compatible endpoint.
+- Added separate GRS.AI credentials, base URL, model defaults, capability
+  metadata, and provider provenance; no automatic Gemini fallback is used.
+- Registered the existing MiniMax H3 video client in the public package and
+  capability catalog.
+
+## 0.9.0
+
+- Added stable Gemini Nano Banana 2 aliases, validated image sizes and long
+  aspect ratios, plus keyed inline Batch image generation.
+- Added Seedream 5 and Seedream 5 Pro contracts and switched local ARK image
+  references to inline Base64.
+- Added MiniMax H3 asynchronous video generation and typed nested structured
+  output helpers.
+
 ## 0.8.0
 
 - Added `dashscope.speech.synthesize` for Qwen-Audio-TTS non-streaming speech synthesis.

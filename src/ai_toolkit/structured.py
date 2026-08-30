@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -30,15 +31,17 @@ class JsonOutputModel(BaseModel):
             properties = {}
 
         example = {
-            field_name: _prompt_example_value(field_name, field_schema)
+            field_name: _prompt_example_value(
+                field_name,
+                field_schema,
+                root_schema=schema,
+                seen_refs=frozenset(),
+            )
             for field_name, field_schema in properties.items()
             if isinstance(field_schema, dict)
         }
         example_text = json.dumps(example, ensure_ascii=False, indent=2)
-        return (
-            "只返回以下结构的 JSON 对象，不要输出解释或 Markdown：\n\n"
-            f"{example_text}"
-        )
+        return f"只返回以下结构的 JSON 对象，不要输出解释或 Markdown：\n\n{example_text}"
 
 
 class StructuredOutputError(AIToolkitError):
@@ -57,8 +60,7 @@ class StructuredOutputError(AIToolkitError):
         self.completion = completion
         self.detail = detail
         super().__init__(
-            f"{output_type.__name__} structured output failed "
-            f"during {stage}: {detail}"
+            f"{output_type.__name__} structured output failed during {stage}: {detail}"
         )
 
 
@@ -115,12 +117,21 @@ def validate_output_model(
 def _prompt_example_value(
     field_name: str,
     field_schema: dict[str, Any],
+    *,
+    root_schema: dict[str, Any],
+    seen_refs: frozenset[str],
 ) -> Any:
+    field_schema, seen_refs, recursive_reference = _resolve_schema_reference(
+        field_schema,
+        root_schema=root_schema,
+        seen_refs=seen_refs,
+    )
+    if recursive_reference:
+        return None
+
     description = field_schema.get("description")
     label = (
-        description.strip()
-        if isinstance(description, str) and description.strip()
-        else field_name
+        description.strip() if isinstance(description, str) and description.strip() else field_name
     )
 
     examples = field_schema.get("examples")
@@ -135,37 +146,160 @@ def _prompt_example_value(
     if isinstance(enum_values, list) and enum_values:
         return enum_values[0]
 
+    if "default" in field_schema:
+        return field_schema["default"]
+
+    variant = _first_non_null_variant(field_schema)
+    if variant is not None:
+        variant_schema = dict(field_schema)
+        variant_schema.pop("anyOf", None)
+        variant_schema.pop("oneOf", None)
+        variant_schema.update(variant)
+        return _prompt_example_value(
+            field_name,
+            variant_schema,
+            root_schema=root_schema,
+            seen_refs=seen_refs,
+        )
+
     value_type = field_schema.get("type")
-    if not isinstance(value_type, str):
-        value_type = _first_non_null_type(field_schema)
 
     if value_type == "string":
         return f"<{label}>"
     if value_type == "integer":
-        return 0
+        return _integer_example(field_schema)
     if value_type == "number":
-        return 0.0
+        return _number_example(field_schema)
     if value_type == "boolean":
         return False
     if value_type == "array":
+        items = field_schema.get("items")
+        minimum_items = field_schema.get("minItems")
+        if (
+            isinstance(items, dict)
+            and isinstance(minimum_items, int)
+            and not isinstance(minimum_items, bool)
+            and minimum_items > 0
+        ):
+            return [
+                _prompt_example_value(
+                    field_name,
+                    items,
+                    root_schema=root_schema,
+                    seen_refs=seen_refs,
+                )
+                for _ in range(minimum_items)
+            ]
         return []
     if value_type == "object":
-        return {}
+        properties = field_schema.get("properties")
+        if not isinstance(properties, dict):
+            return {}
+        return {
+            nested_name: _prompt_example_value(
+                nested_name,
+                nested_schema,
+                root_schema=root_schema,
+                seen_refs=seen_refs,
+            )
+            for nested_name, nested_schema in properties.items()
+            if isinstance(nested_schema, dict)
+        }
     return None
 
 
-def _first_non_null_type(field_schema: dict[str, Any]) -> str | None:
-    variants = field_schema.get("anyOf")
-    if not isinstance(variants, list):
-        return None
+def _resolve_schema_reference(
+    field_schema: dict[str, Any],
+    *,
+    root_schema: dict[str, Any],
+    seen_refs: frozenset[str],
+) -> tuple[dict[str, Any], frozenset[str], bool]:
+    reference = field_schema.get("$ref")
+    if not isinstance(reference, str) or not reference.startswith("#/"):
+        return field_schema, seen_refs, False
 
-    for variant in variants:
-        if not isinstance(variant, dict):
+    if reference in seen_refs:
+        return field_schema, seen_refs, True
+
+    resolved = _resolve_local_reference(root_schema, reference)
+    if not isinstance(resolved, dict):
+        return field_schema, seen_refs, False
+
+    merged = dict(resolved)
+    merged.update({key: value for key, value in field_schema.items() if key != "$ref"})
+    return merged, seen_refs | {reference}, False
+
+
+def _resolve_local_reference(root_schema: dict[str, Any], reference: str) -> Any:
+    current: Any = root_schema
+    for raw_part in reference[2:].split("/"):
+        if not isinstance(current, dict):
+            return None
+        part = raw_part.replace("~1", "/").replace("~0", "~")
+        current = current.get(part)
+    return current
+
+
+def _first_non_null_variant(
+    field_schema: dict[str, Any],
+) -> dict[str, Any] | None:
+    for keyword in ("anyOf", "oneOf"):
+        variants = field_schema.get(keyword)
+        if not isinstance(variants, list):
             continue
-        value_type = variant.get("type")
-        if isinstance(value_type, str) and value_type != "null":
-            return value_type
+
+        fallback = None
+        for variant in variants:
+            if not isinstance(variant, dict):
+                continue
+            if fallback is None:
+                fallback = variant
+            if variant.get("type") != "null":
+                return variant
+        return fallback
     return None
+
+
+def _integer_example(field_schema: dict[str, Any]) -> int:
+    candidate = 0
+    minimum = _schema_number(field_schema.get("minimum"))
+    exclusive_minimum = _schema_number(field_schema.get("exclusiveMinimum"))
+    maximum = _schema_number(field_schema.get("maximum"))
+    exclusive_maximum = _schema_number(field_schema.get("exclusiveMaximum"))
+
+    if minimum is not None:
+        candidate = max(candidate, math.ceil(minimum))
+    if exclusive_minimum is not None:
+        candidate = max(candidate, math.floor(exclusive_minimum) + 1)
+    if maximum is not None and candidate > maximum:
+        candidate = math.floor(maximum)
+    if exclusive_maximum is not None and candidate >= exclusive_maximum:
+        candidate = math.ceil(exclusive_maximum) - 1
+    return candidate
+
+
+def _number_example(field_schema: dict[str, Any]) -> float:
+    candidate = 0.0
+    minimum = _schema_number(field_schema.get("minimum"))
+    exclusive_minimum = _schema_number(field_schema.get("exclusiveMinimum"))
+    maximum = _schema_number(field_schema.get("maximum"))
+    exclusive_maximum = _schema_number(field_schema.get("exclusiveMaximum"))
+
+    if minimum is not None and candidate < minimum:
+        candidate = float(minimum)
+    if exclusive_minimum is not None and candidate <= exclusive_minimum:
+        candidate = math.nextafter(float(exclusive_minimum), math.inf)
+    if maximum is not None and candidate > maximum:
+        candidate = float(maximum)
+    if exclusive_maximum is not None and candidate >= exclusive_maximum:
+        candidate = math.nextafter(float(exclusive_maximum), -math.inf)
+    return candidate
+
+
+def _schema_number(value: Any) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
 
 
 def _validation_error_detail(error: ValidationError) -> str:
